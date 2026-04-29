@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NFL Prediction Machine</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0c0e14;
+  --ink2: #12151f;
+  --ink3: #181c28;
+  --ink4: #1e2335;
+  --line: #252c42;
+  --line2: #2e3850;
+  --gold: #d4a843;
+  --gold2: #f0c866;
+  --gold3: #8a6820;
+  --blue: #3d7dd4;
+  --blue2: #6ba3f5;
+  --green: #34c977;
+  --green2: #1a6640;
+  --red: #e84545;
+  --red2: #6a1a1a;
+  --yellow: #f5c842;
+  --purple: #9b6be8;
+  --text: #c8d4ee;
+  --text2: #7a8aaa;
+  --text3: #3a4560;
+  --auto: #0d2218;
+  --auto-t: #34c977;
+  --manual: #1a1200;
+  --manual-t: #d4a843;
+  --dog-col: #9b6be8;
+  --fav-col: #3d7dd4;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--ink);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* === HEADER === */
+.hdr{background:linear-gradient(180deg,#0a0c12 0%,var(--ink2) 100%);border-bottom:1px solid var(--line);display:grid;grid-template-columns:auto 1fr auto;align-items:center;padding:0 20px;min-height:64px;gap:20px}
+.hdr-brand{display:flex;align-items:center;gap:12px}
+.hdr-logo{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--gold);letter-spacing:3px;line-height:1;text-shadow:0 0 30px rgba(212,168,67,.3)}
+.hdr-sub{font-size:10px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+.hdr-record{display:flex;gap:0;align-items:stretch}
+.hdr-stat{padding:8px 16px;border-left:1px solid var(--line);text-align:center;display:flex;flex-direction:column;justify-content:center}
+.hdr-stat .n{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--gold2);line-height:1}
+.hdr-stat .l{font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+.api-status{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text3);padding:6px 12px;background:var(--ink3);border:1px solid var(--line);border-radius:20px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+.dot.err{background:var(--red);box-shadow:0 0 8px var(--red)}
+.dot.spin-dot{background:var(--yellow);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* === TABS === */
+.nav{background:var(--ink2);border-bottom:1px solid var(--line);display:flex;overflow-x:auto;padding:0 16px;gap:0}
+.nav-tab{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);padding:14px 20px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s}
+.nav-tab:hover{color:var(--text2)}
+.nav-tab.on{color:var(--gold);border-bottom-color:var(--gold)}
+
+/* === PAGES === */
+.page{display:none;padding:16px;max-width:1800px;margin:0 auto}
+.page.on{display:block}
+
+/* === CONTROL BAR === */
+.ctrl{background:var(--ink2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.ctrl-title{font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--gold);letter-spacing:2px;margin-bottom:12px}
+.ctrl-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.cg{display:flex;flex-direction:column;gap:4px}
+.cg label{font-size:10px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;font-family:'DM Mono',monospace}
+select,input[type=number],input[type=text]{background:var(--ink3);border:1px solid var(--line2);color:var(--text);padding:7px 10px;border-radius:6px;font-family:'DM Mono',monospace;font-size:12px;transition:border-color .2s}
+select:focus,input:focus{outline:none;border-color:var(--blue)}
+input[type=number]::-webkit-inner-spin-button{opacity:.3}
+
+/* === BUTTONS === */
+button{font-family:'DM Sans',sans-serif;font-weight:700;cursor:pointer;border-radius:6px;transition:all .15s;border:1px solid}
+.btn-gold{background:linear-gradient(135deg,var(--gold3),var(--gold));color:#000;border-color:var(--gold);padding:8px 18px;font-size:13px}
+.btn-gold:hover{background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.btn-blue{background:var(--ink3);color:var(--blue2);border-color:var(--blue);padding:8px 16px;font-size:13px}
+.btn-blue:hover{background:#1a2a45}
+.btn-green{background:var(--ink3);color:var(--green);border-color:var(--green2);padding:8px 16px;font-size:13px}
+.btn-green:hover{background:#0a1f12}
+.btn-red{background:var(--ink3);color:var(--red);border-color:var(--red2);padding:8px 16px;font-size:13px}
+.btn-red:hover{background:#1f0a0a}
+.btn-sm{padding:4px 10px;font-size:11px}
+button:disabled{opacity:.4;cursor:not-allowed}
+
+/* === STATUS === */
+.status{font-size:12px;padding:6px 12px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-family:'DM Mono',monospace}
+.s-ok{background:#0a1f12;color:var(--green);border:1px solid #1a5a2a}
+.s-err{background:#1f0a0a;color:var(--red);border:1px solid #5a1a1a}
+.s-load{background:#0a1220;color:var(--blue2);border:1px solid #1a3a6a}
+.spinner{width:11px;height:11px;border:2px solid var(--line2);border-top-color:var(--blue2);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* === INFO BOX === */
+.info{background:var(--ink2);border-left:3px solid var(--blue);padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:14px;font-size:12px;color:var(--text2);line-height:1.8;font-family:'DM Mono',monospace}
+.info a{color:var(--blue2);text-decoration:none}
+.info strong{color:var(--text)}
+
+/* === GAME CARDS === */
+.games-wrap{display:flex;flex-direction:column;gap:10px}
+.game-card{background:var(--ink2);border:1px solid var(--line);border-radius:10px;overflow:hidden;transition:border-color .2s}
+.game-card:hover{border-color:var(--line2)}
+.gc-head{background:linear-gradient(90deg,#0e1220,var(--ink2));padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.gc-rank{font-family:'Bebas Neue',sans-serif;font-size:28px;line-height:1;min-width:32px;text-align:center}
+.gc-rank.r16{color:var(--gold);text-shadow:0 0 20px rgba(212,168,67,.5)}
+.gc-rank.r-hi{color:var(--gold2)}
+.gc-rank.r-mid{color:var(--text2)}
+.gc-rank.r-lo{color:var(--text3)}
+.gc-matchup{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:.5px;color:var(--text)}
+.gc-vs{color:var(--text3);margin:0 6px}
+.gc-badges{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.badge{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;font-family:'DM Mono',monospace;letter-spacing:.5px;white-space:nowrap}
+.b-home{background:#0d1e3a;color:var(--blue2);border:1px solid #1a3a6a}
+.b-vis{background:#1a0d3a;color:var(--purple);border:1px solid #3a1a6a}
+.b-dog{background:#1a0d2a;color:var(--dog-col);border:1px solid #3a1a5a}
+.b-over{background:#0a1f0a;color:var(--green);border:1px solid #1a5a1a}
+.b-under{background:#1f0a0a;color:var(--red);border:1px solid #5a1a1a}
+.b-win{background:#0a1f0a;color:var(--green)}
+.b-lose{background:#1f0a0a;color:var(--red)}
+.b-push{background:#1a1200;color:var(--yellow)}
+.b-alert{background:#1a1000;color:var(--yellow);border:1px solid #4a3000;cursor:help}
+.b-esp{background:var(--auto);color:var(--auto-t);border:1px solid #1a4a2a;font-size:10px}
+.b-nfl{background:var(--manual);color:var(--manual-t);border:1px solid #3a2a00;font-size:10px}
+.gc-body{padding:12px 14px}
+.tgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tblock{background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:11px}
+.tblock.home{border-left:3px solid var(--blue)}
+.tblock.vis{border-left:3px solid var(--purple)}
+.tname{font-family:'Bebas Neue',sans-serif;font-size:16px;margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.home .tname{color:var(--blue2)}
+.vis .tname{color:var(--purple)}
+.trec{font-size:10px;color:var(--text3);font-weight:400;font-family:'DM Mono',monospace}
+.srow{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.srow label{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
+.srow input{width:72px;text-align:right;padding:3px 6px;font-size:12px}
+.stag{font-size:9px;border-radius:3px;padding:1px 5px;margin-left:4px;font-family:'DM Mono',monospace}
+.st-a{background:var(--auto);color:var(--auto-t)}
+.st-m{background:var(--manual);color:var(--manual-t)}
+.divlabel{font-size:9px;color:var(--text3);background:var(--ink);border:1px solid var(--line);border-radius:3px;padding:2px 7px;margin:6px 0 4px;letter-spacing:1px;text-transform:uppercase;font-family:'DM Mono',monospace;display:inline-block}
+.gc-bottom{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.sg{display:flex;flex-direction:column;gap:3px}
+.sg label{font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;font-family:'DM Mono',monospace}
+.gc-result{margin-left:auto;display:flex;gap:14px;align-items:center}
+.rval{text-align:center}
+.rval .rl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;font-family:'DM Mono',monospace}
+.rval .rv{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--text)}
+.diff-0{color:var(--green);text-shadow:0 0 12px rgba(52,201,119,.4)}
+.diff-1{color:var(--gold2)}
+.diff-2{color:var(--red)}
+.alerts-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.alert-badge{font-size:10px;padding:3px 9px;border-radius:10px;background:#1a1500;color:var(--yellow);border:1px solid #3a3000;font-family:'DM Mono',monospace;cursor:help}
+
+/* === RANKED TABLE === */
+.sec-title{font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin:16px 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px;display:flex;align-items:center;gap:10px}
+.scroll{overflow-x:auto}
+.dtable{width:100%;border-collapse:collapse;font-size:12px}
+.dtable th{background:var(--ink);color:var(--text3);padding:8px 10px;text-align:left;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;border-bottom:1px solid var(--line);white-space:nowrap;font-family:'DM Mono',monospace}
+.dtable td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+.dtable tr:hover td{background:var(--ink3)}
+.rnum{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:14px;font-weight:700}
+.rn-gold{background:var(--gold);color:#000;box-shadow:0 0 12px rgba(212,168,67,.4)}
+.rn-silver{background:#666;color:#fff}
+.rn-bronze{background:#8b4513;color:#ffd7aa}
+.rn-hi{background:var(--ink4);color:var(--gold2);border:1px solid var(--gold3)}
+.rn-mid{background:var(--ink4);color:var(--text2);border:1px solid var(--line2)}
+.rn-lo{background:var(--ink4);color:var(--text3);border:1px solid var(--line)}
+
+/* === STAT CARDS === */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.scard{background:var(--ink2);border:1px solid var(--line);border-radius:8px;padding:14px}
+.scard .sl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;font-family:'DM Mono',monospace}
+.scard .sv{font-family:'Bebas Neue',sans-serif;font-size:30px;color:var(--gold2);line-height:1}
+.scard .ss{font-size:11px;color:var(--text3);margin-top:3px;font-family:'DM Mono',monospace}
+.pbar{height:4px;background:var(--ink4);border-radius:2px;margin-top:8px;overflow:hidden}
+.pfill{height:100%;border-radius:2px;transition:width .6s ease}
+.pfill-g{background:linear-gradient(90deg,var(--green2),var(--green))}
+.pfill-b{background:linear-gradient(90deg,var(--blue),var(--blue2))}
+
+/* === TIER CARDS === */
+.tier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.tier-card{background:var(--ink2);border:1px solid var(--line);border-radius:8px;padding:14px}
+.tier-card .tc-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;font-family:'DM Mono',monospace}
+.tier-card .tc-range{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold);margin-bottom:4px}
+.tier-card .tc-pct{font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1}
+.tier-card .tc-rec{font-size:11px;color:var(--text3);margin-top:4px;font-family:'DM Mono',monospace}
+
+/* === HISTORY TABLE === */
+.htable{width:100%;border-collapse:collapse;font-size:12px}
+.htable th{background:var(--ink);color:var(--text3);padding:7px 10px;text-align:left;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;border-bottom:1px solid var(--line);font-family:'DM Mono',monospace}
+.htable td{padding:6px 10px;border-bottom:1px solid var(--line);font-family:'DM Mono',monospace}
+.htable tr:hover td{background:var(--ink3)}
+.wc{color:var(--green);font-weight:700}
+.lc{color:var(--red);font-weight:700}
+.pc{color:var(--yellow);font-weight:700}
+.pct-hi{color:var(--green);font-weight:700}
+.pct-mid{color:var(--yellow);font-weight:700}
+.pct-lo{color:var(--red)}
+
+/* === BACKFILL === */
+.bf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:12px}
+.bf-card{background:var(--ink2);border:1px solid var(--line);border-radius:8px;padding:12px}
+.bf-year{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--gold);margin-bottom:3px}
+.bf-stat{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
+.prgbar{height:5px;background:var(--ink4);border-radius:3px;margin-top:8px;overflow:hidden}
+.prgfill{height:100%;background:linear-gradient(90deg,var(--blue),var(--gold));border-radius:3px;transition:width .4s}
+
+/* === RESULTS === */
+.res-block{background:var(--ink2);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:8px}
+
+/* === EMPTY STATE === */
+.empty{color:var(--text3);font-size:13px;padding:40px;text-align:center;border:1px dashed var(--line);border-radius:8px;margin-top:4px;font-family:'DM Mono',monospace;line-height:2}
+.empty strong{color:var(--gold);display:block;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;margin-bottom:8px}
+
+/* === HOWTO === */
+.howto-card{background:var(--ink2);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:10px;max-width:720px}
+.howto-card h3{font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--gold);letter-spacing:2px;margin-bottom:10px}
+.howto-card p,.howto-card li{font-size:13px;color:var(--text2);line-height:1.8;font-family:'DM Mono',monospace}
+.howto-card ul{padding-left:18px}
+.howto-card a{color:var(--blue2)}
+
+@media(max-width:700px){.tgrid{grid-template-columns:1fr}.hdr-record{display:none}.tier-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-brand">
+    <div>
+      <div class="hdr-logo">NFL PREDICTOR</div>
+      <div class="hdr-sub">Phase 1 &bull; Powered by ESPN API</div>
+    </div>
+  </div>
+  <div></div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div class="hdr-record">
+      <div class="hdr-stat"><div class="n" id="h-pct">—</div><div class="l">Win %</div></div>
+      <div class="hdr-stat"><div class="n" id="h-w" style="color:var(--green)">0</div><div class="l">Wins</div></div>
+      <div class="hdr-stat"><div class="n" id="h-l" style="color:var(--red)">0</div><div class="l">Losses</div></div>
+      <div class="hdr-stat"><div class="n" id="h-wks">0</div><div class="l">Weeks</div></div>
+    </div>
+    <div class="api-status"><div class="dot" id="api-dot"></div><span id="api-txt">ESPN API</span></div>
+  </div>
+</div>
+
+<!-- NAV -->
+<!-- LOCAL FILE WARNING -->
+<div id="local-warn" style="display:none;background:#2a1500;border-bottom:1px solid #6a3500;padding:10px 20px;font-size:12px;color:#ffaa44;font-family:'DM Mono',monospace;display:flex;align-items:center;gap:10px">
+  ⚠ <strong>Local File Mode:</strong> ESPN team stats (PA, rankings) require the app to be hosted online due to browser security restrictions.
+  <strong>Fix:</strong> Upload this file to your Netlify account — everything will work fully there.
+  The scoreboard/schedule fetch still works locally. Stats fields will need manual entry until hosted.
+  <button onclick="document.getElementById('local-warn').style.display='none'" style="margin-left:auto;background:none;border:1px solid #6a3500;color:#ffaa44;padding:3px 10px;cursor:pointer;border-radius:4px;font-size:11px">Dismiss</button>
+</div>
+
+<div class="nav">
+  <div class="nav-tab on" onclick="showTab('predictor',this)">Weekly Predictor</div>
+  <div class="nav-tab" onclick="showTab('results',this)">Enter Results</div>
+  <div class="nav-tab" onclick="showTab('record',this)">Win / Loss Record</div>
+  <div class="nav-tab" onclick="showTab('backfill',this)">Historical Backfill</div>
+  <div class="nav-tab" onclick="showTab('notes',this)">Situational Notes</div>
+  <div class="nav-tab" onclick="showTab('howto',this)">How To Use</div>
+</div>
+
+<!-- ===== PREDICTOR ===== -->
+<div id="tab-predictor" class="page on">
+  <div class="ctrl">
+    <div class="ctrl-title">⚡ Auto-Fetch Week — All Stats from ESPN</div>
+    <div class="ctrl-row">
+      <div class="cg"><label>Season</label>
+        <select id="yr">
+          <option value="2025">2025</option><option value="2024">2024</option>
+          <option value="2023">2023</option><option value="2022">2022</option>
+          <option value="2021">2021</option><option value="2020">2020</option>
+        </select>
+      </div>
+      <div class="cg"><label>Week</label>
+        <select id="wk">
+          <option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option>
+          <option value="4">Week 4</option><option value="5">Week 5</option><option value="6">Week 6</option>
+          <option value="7">Week 7</option><option value="8">Week 8</option><option value="9">Week 9</option>
+          <option value="10">Week 10</option><option value="11">Week 11</option><option value="12">Week 12</option>
+          <option value="13">Week 13</option><option value="14">Week 14</option><option value="15">Week 15</option>
+          <option value="16">Week 16</option><option value="17">Week 17</option><option value="18">Week 18</option>
+        </select>
+      </div>
+      <button class="btn-blue" id="fetch-btn" onclick="fetchWeek()">↓ Fetch Games + Stats</button>
+      <button class="btn-gold" onclick="calcAll()">▶ Calculate &amp; Rank</button>
+      <button class="btn-red" onclick="clearWeek()">✕ Clear Week</button>
+    </div>
+    <div id="fstatus"></div>
+  </div>
+
+  <div class="info">
+    <strong>Auto-fetched (ESPN):</strong> Matchups · Records · PF · PA · Turnovers · Pass/Rush Off &amp; Def Ranks · Yards/Play · 3rd Down % · Time of Possession<br>
+    <strong>You enter:</strong> Spread and/or Total (one or both — calculation works either way)<br>
+    <strong>Ranking:</strong> 16 = most confident (largest gap from Vegas line) · 1 = least confident · Yahoo Pick'em compatible
+  </div>
+
+  <div id="games-wrap" class="games-wrap"></div>
+
+  <div id="ranked-section" style="display:none">
+    <div class="sec-title">🏆 Confidence Rankings — 16 Most Confident → 1 Least</div>
+    <div class="scroll">
+    <table class="dtable">
+      <thead><tr>
+        <th>Rank</th><th>Matchup</th><th>Pick</th><th>Dog?</th>
+        <th>Est. Score</th><th>Spread Diff</th><th>O/U Pick</th>
+        <th>Est. Total</th><th>Alerts</th>
+      </tr></thead>
+      <tbody id="ranked-body"></tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===== RESULTS ===== -->
+<div id="tab-results" class="page">
+  <div class="sec-title">Enter Actual Results — Week <span id="res-wk">—</span></div>
+  <div class="info">Enter final scores after games are played to track your record.</div>
+  <div id="res-form"><div class="empty"><strong>No Games Yet</strong>Fetch and calculate games first.</div></div>
+</div>
+
+<!-- ===== RECORD ===== -->
+<div id="tab-record" class="page">
+  <div class="sec-title">Overall Prediction Record</div>
+  <div class="sgrid" id="rec-cards"></div>
+
+  <div class="sec-title">Confidence Tier Breakdown</div>
+  <div class="tier-grid" id="tier-cards"></div>
+
+  <div class="sec-title">Week-by-Week History</div>
+  <div class="scroll">
+  <table class="htable">
+    <thead><tr><th>Year</th><th>Wk</th><th>Games</th><th>W</th><th>L</th><th>Push</th><th>Win%</th>
+      <th>Tier 1-5</th><th>Tier 6-10</th><th>Tier 11-16</th><th>Source</th></tr></thead>
+    <tbody id="hist-body"></tbody>
+  </table>
+  </div>
+  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn-red" onclick="clearHistory()">Clear All History</button>
+    <button class="btn-blue" onclick="exportCSV()">↓ Export CSV</button>
+  </div>
+</div>
+
+<!-- ===== BACKFILL ===== -->
+<div id="tab-backfill" class="page">
+  <div class="ctrl">
+    <div class="ctrl-title">📅 Historical Backfill — Build Record 2002–2025</div>
+    <div class="ctrl-row">
+      <div class="cg"><label>From Year</label>
+        <select id="bf-from">
+          <option value="2002">2002</option><option value="2003">2003</option><option value="2004">2004</option>
+          <option value="2005">2005</option><option value="2006">2006</option><option value="2007">2007</option>
+          <option value="2008">2008</option><option value="2009">2009</option><option value="2010">2010</option>
+          <option value="2011">2011</option><option value="2012">2012</option><option value="2013">2013</option>
+          <option value="2014">2014</option><option value="2015">2015</option><option value="2016">2016</option>
+          <option value="2017">2017</option><option value="2018">2018</option><option value="2019">2019</option>
+          <option value="2020">2020</option><option value="2021">2021</option><option value="2022">2022</option>
+          <option value="2023">2023</option><option value="2024">2024</option>
+        </select>
+      </div>
+      <div class="cg"><label>To Year</label>
+        <select id="bf-to">
+          <option value="2025" selected>2025</option><option value="2024">2024</option>
+          <option value="2023">2023</option><option value="2022">2022</option><option value="2021">2021</option>
+          <option value="2020">2020</option><option value="2019">2019</option><option value="2018">2018</option>
+        </select>
+      </div>
+      <button class="btn-gold" id="bf-btn" onclick="startBackfill()">▶ Start Backfill</button>
+      <button class="btn-red" onclick="bfStop=true">■ Stop</button>
+    </div>
+    <div id="bf-status"></div>
+  </div>
+  <div class="info">
+    Fetches every completed game from ESPN, runs your formula, compares against actual results.
+    Skips weeks you've manually entered. ~2–3 min per season. Runs in background.
+  </div>
+  <div id="bf-progress"></div>
+  <div class="sec-title">Results by Season</div>
+  <div class="scroll">
+  <table class="dtable">
+    <thead><tr><th>Season</th><th>Weeks</th><th>Games</th><th>Wins</th><th>Losses</th><th>Pushes</th>
+      <th>Win%</th><th>O/U W</th><th>O/U L</th><th>O/U%</th></tr></thead>
+    <tbody id="bf-results"></tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ===== SITUATIONAL NOTES ===== -->
+<div id="tab-notes" class="page">
+  <div class="sec-title">📋 Situational Rules Reference</div>
+  <div class="info">These are your collected betting tendencies. High-value rules are flagged automatically on game cards as alerts. Verify these periodically — some may have evolved since collected.</div>
+  <div id="notes-content"></div>
+</div>
+
+<!-- ===== HOW TO USE ===== -->
+<div id="tab-howto" class="page">
+  <div class="howto-card">
+    <h3>Step 1 — Fetch</h3>
+    <ul>
+      <li>Select season and week, click <strong>Fetch Games + Stats</strong></li>
+      <li>ESPN auto-fills: matchups, spread, records, PF, PA, turnovers, all 4 ranking stats, yards/play, 3rd down %, time of possession</li>
+    </ul>
+  </div>
+  <div class="howto-card">
+    <h3>Step 2 — Enter Spread / Total</h3>
+    <ul>
+      <li>Enter the spread from your preferred book — you can enter spread only, total only, or both</li>
+      <li>Calculation works with either or both — live recalculates as you type</li>
+      <li>You can also adjust any auto-fetched stat manually</li>
+    </ul>
+  </div>
+  <div class="howto-card">
+    <h3>Step 3 — Calculate &amp; Rank</h3>
+    <ul>
+      <li>Click <strong>Calculate &amp; Rank</strong> — games rank 16 (most confident) down to 1 (least confident)</li>
+      <li>Your formula: PF/PA base scores → ranking adjustments (1-9 diff = 1pt, 10-19 = 2pt, 20-31 = 3pt) → result</li>
+      <li><strong>Ranking logic:</strong> Largest gap between your estimated spread and Vegas line = rank 16 (most confident). Example: your model says 8, Vegas says 2 → diff of 6 → high rank. Small diff = low rank.</li>
+      <li>Underdog picks are flagged in purple</li>
+      <li>Situational alerts appear automatically based on game context</li>
+    </ul>
+  </div>
+  <div class="howto-card">
+    <h3>Step 4 — Enter Results</h3>
+    <ul>
+      <li>After games, go to <strong>Enter Results</strong>, add final scores, save</li>
+      <li>Win% tracks overall and by confidence tier (1–5, 6–10, 11–16)</li>
+    </ul>
+  </div>
+  <div class="howto-card">
+    <h3>Early Season Stat Blending</h3>
+    <ul>
+      <li><strong>Week 1:</strong> 70% prior season final stats + 30% preseason stats — no current season data exists yet</li>
+      <li><strong>Week 2:</strong> 60% prior + 20% preseason + 20% current (1 game of real data)</li>
+      <li><strong>Week 3:</strong> 40% prior + 10% preseason + 50% current (2 games of real data)</li>
+      <li><strong>Week 4+:</strong> 100% current season stats only</li>
+      <li>All blending happens automatically in the background. A ⚗ badge appears on blended games.</li>
+      <li>Hover the ⚗ icon on any team to see the exact blend breakdown applied.</li>
+      <li>These weights are our starting point — deep analysis will tell us if different ratios work better.</li>
+    </ul>
+  </div>
+    <ul>
+      <li>If home PF avg > vis PA avg: home_base = (h_pf - h_pf/v_pa) / 2</li>
+      <li>If home PF avg &lt; vis PA avg: home_base = h_pf + v_pa/h_pf</li>
+      <li>If home PA avg > vis PF avg: vis_base = v_pf + h_pa/v_pf</li>
+      <li>If home PA avg &lt; vis PF avg: vis_base = (v_pf - v_pf/h_pa) / 2</li>
+      <li>Each team's pass/rush rank vs opponent's pass/rush def rank → ±1/2/3 pts</li>
+      <li>Spread diff = |estimated spread − Vegas line| → <strong>larger diff = higher confidence rank</strong> (your model disagrees more with the market)</li>
+    </ul>
+  </div>
+  <div class="howto-card">
+    <h3>Key Numbers (Most Common NFL Margins)</h3>
+    <p style="margin-top:6px">3 · 7 · 6 · 14 · 10 · 5 · 8 · 4 · 1 · 2 · 17<br>
+    <span style="color:var(--text3);font-size:11px">Note: 6 and 4 are becoming more frequent with increased 4th-down attempts and 2-pt conversions. Verify current distributions in deep analysis phase.</span></p>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// CONSTANTS & STATE
+// =====================================================================
+const PROXY = 'https://corsproxy.io/?';
+const ESPN_SB = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard';
+const ESPN_CORE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl';
+
+const TEAM_IDS = {
+  ARI:22,ATL:1,BAL:33,BUF:2,CAR:29,CHI:3,CIN:4,CLE:5,DAL:6,DEN:7,DET:8,
+  GB:9,HOU:34,IND:11,JAX:30,KC:12,LAC:24,LAR:14,LV:13,MIA:15,MIN:16,
+  NE:17,NO:18,NYG:19,NYJ:20,PHI:21,PIT:23,SEA:26,SF:25,TB:27,TEN:10,WAS:28
+};
+
+// Division map for situational rules
+const DIVISIONS = {
+  'NFC East': ['DAL','NYG','PHI','WAS'],
+  'NFC North': ['CHI','DET','GB','MIN'],
+  'NFC South': ['ATL','CAR','NO','TB'],
+  'NFC West': ['ARI','LAR','SF','SEA'],
+  'AFC East': ['BUF','MIA','NE','NYJ'],
+  'AFC North': ['BAL','CIN','CLE','PIT'],
+  'AFC South': ['HOU','IND','JAX','TEN'],
+  'AFC West': ['DEN','KC','LAC','LV']
+};
+
+function getDiv(team) {
+  for (const [div, teams] of Object.entries(DIVISIONS))
+    if (teams.includes(team)) return div;
+  return null;
+}
+function sameDivision(t1, t2) {
+  const d1 = getDiv(t1), d2 = getDiv(t2);
+  return d1 && d2 && d1 === d2;
+}
+
+let games = [], history = {}, curYear = 2025, curWeek = 1, bfStop = false;
+
+// =====================================================================
+// PERSISTENCE
+// =====================================================================
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem('nfl_p1') || '{}');
+    games = d.games || []; history = d.history || {};
+    curYear = d.curYear || 2025; curWeek = d.curWeek || 1;
+    document.getElementById('yr').value = curYear;
+    document.getElementById('wk').value = curWeek;
+  } catch(e) {}
+  renderGames(); renderRecord(); renderBfResults(); renderNotes();
+  updateHeader();
+}
+function persist() {
+  try { localStorage.setItem('nfl_p1', JSON.stringify({games, history, curYear, curWeek})); } catch(e) {}
+}
+
+// =====================================================================
+// API HELPERS
+// =====================================================================
+function setDot(state) {
+  const d = document.getElementById('api-dot');
+  const t = document.getElementById('api-txt');
+  d.className = 'dot' + (state==='ok'?'':state==='err'?' err':' spin-dot');
+  t.textContent = state==='ok'?'ESPN Connected':state==='err'?'ESPN Error':'Fetching...';
+}
+async function apiFetch(url) {
+  // Detect local file:// — CORS proxy won't work, ESPN direct may work
+  const isLocal = window.location.protocol === 'file:';
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } catch(e) {
+    if (isLocal) {
+      // Running from local file — try direct fetch only, no proxy
+      // ESPN's scoreboard API works directly; core stats API may be blocked
+      try {
+        const r2 = await fetch(url, { mode: 'cors' });
+        if (!r2.ok) throw new Error('HTTP ' + r2.status);
+        return await r2.json();
+      } catch(e2) {
+        // For stats endpoint failures on local file, return null gracefully
+        console.warn('[Local File Mode] Cannot fetch:', url, '— upload to Netlify for full stats access');
+        return null;
+      }
+    }
+    // On hosted version, try CORS proxy
+    try {
+      const r = await fetch(PROXY + encodeURIComponent(url));
+      if (!r.ok) throw new Error('Proxy HTTP ' + r.status);
+      return await r.json();
+    } catch(pe) {
+      throw new Error(`Both direct and proxy failed: ${e.message}`);
+    }
+  }
+}
+
+// Check if running locally and warn user
+function checkLocalFileMode() {
+  if (window.location.protocol === 'file:') {
+    const warn = document.getElementById('local-warn');
+    if (warn) warn.style.display = 'block';
+  }
+}
+function setStatus(id, msg, cls) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = `<span class="status ${cls}">${cls==='s-load'?'<div class="spinner"></div>':''}${msg}</span>`;
+}
+
+// =====================================================================
+// TEAM STATS FETCH + EARLY SEASON BLENDING
+// =====================================================================
+
+// Blend weights by week:
+// Week 1:  70% prior season final + 30% preseason
+// Week 2:  60% prior season + 20% preseason + 20% current
+// Week 3:  40% prior season + 10% preseason + 50% current
+// Week 4+: 100% current season
+const BLEND_WEIGHTS = {
+  1: { prior: 0.70, pre: 0.30, cur: 0.00, label: 'Wk1 Blend: 70% Prior + 30% Preseason' },
+  2: { prior: 0.60, pre: 0.20, cur: 0.20, label: 'Wk2 Blend: 60% Prior + 20% Preseason + 20% Current' },
+  3: { prior: 0.40, pre: 0.10, cur: 0.50, label: 'Wk3 Blend: 40% Prior + 10% Preseason + 50% Current' },
+};
+
+async function fetchRawStats(abbr, year, seasonType) {
+  // seasonType: 1=preseason, 2=regular season
+  const id = TEAM_IDS[abbr];
+  if (!id) return null;
+  try {
+    const url = `${ESPN_CORE}/seasons/${year}/types/${seasonType}/teams/${id}/statistics`;
+    const data = await apiFetch(url);
+    const s = {};
+    if (data.splits && data.splits.categories) {
+      for (const cat of data.splits.categories) {
+        const catName = (cat.name || '').toLowerCase();
+        for (const stat of (cat.stats || [])) {
+          // Store by stat name
+          s[stat.name] = parseFloat(stat.value) || 0;
+          // Store by "category.statName" for disambiguation
+          s[catName + '.' + stat.name] = parseFloat(stat.value) || 0;
+          if (stat.rank !== undefined) {
+            s[stat.name + '_rank'] = parseInt(stat.rank) || 16;
+            s[catName + '.' + stat.name + '_rank'] = parseInt(stat.rank) || 16;
+          }
+        }
+      }
+    }
+    // Also try the team summary endpoint for simpler points data
+    if (!s['totalPoints'] && !s['totalPointsPerGame']) {
+      try {
+        const sumUrl = `${ESPN_CORE}/seasons/${year}/types/${seasonType}/teams/${id}`;
+        const sumData = await apiFetch(sumUrl);
+        if (sumData.record?.items) {
+          for (const item of sumData.record.items) {
+            if (item.stats) {
+              for (const st of item.stats) {
+                if (!s[st.name]) s['record.' + st.name] = parseFloat(st.value) || 0;
+              }
+            }
+          }
+        }
+      } catch(e) {}
+    }
+    return Object.keys(s).length > 0 ? s : null;
+  } catch(e) { return null; }
+}
+
+function parseStats(raw, gp) {
+  if (!raw || gp <= 0) return null;
+
+  // ── POINTS FOR ──────────────────────────────────────────────────────
+  // ESPN returns per-game averages in the stats API — multiply by GP to get season total
+  const pfPG = raw['totalPointsPerGame'] || raw['scoring.totalPointsPerGame'] ||
+               raw['pointsPerGame'] || raw['scoring.pointsPerGame'] || 0;
+  const pfTotal = raw['totalPoints'] || raw['scoring.totalPoints'] ||
+                  raw['points'] || raw['scoring.points'] || 0;
+  // Use per-game × GP if available, otherwise fall back to total
+  const pf = pfPG > 0 ? Math.round(pfPG * gp) : Math.round(pfTotal);
+
+  // ── POINTS AGAINST ───────────────────────────────────────────────────
+  // ESPN stores PA under "defensive" or "general" category
+  // Field names vary: try all known variants
+  const paPG = raw['totalPointsAllowedPerGame'] || raw['defensive.totalPointsAllowedPerGame'] ||
+               raw['opponentPointsPerGame']      || raw['defensive.opponentPointsPerGame'] ||
+               raw['pointsAllowedPerGame']        || raw['general.pointsAllowedPerGame'] ||
+               raw['avgPointsAllowed']            || 0;
+  const paTotal = raw['totalPointsAllowed']      || raw['defensive.totalPointsAllowed'] ||
+                  raw['opponentTotalPoints']       || raw['defensive.opponentTotalPoints'] ||
+                  raw['pointsAllowed']             || raw['defensivePointsAllowed'] || 0;
+  const pa = paPG > 0 ? Math.round(paPG * gp) : Math.round(paTotal);
+
+  // ── TURNOVER RATIO ───────────────────────────────────────────────────
+  const toRatio = raw['turnoverRatio']        || raw['general.turnoverRatio'] ||
+                  raw['turnoverDifferential']  || raw['general.turnoverDifferential'] || null;
+  let to = 0;
+  if (toRatio !== null) {
+    to = Math.round(toRatio);
+  } else {
+    const takeaways = (raw['defensiveInterceptions'] || raw['defensive.interceptions'] ||
+                       raw['interceptions'] || 0) +
+                      (raw['fumblesRecovered'] || raw['defensive.fumblesRecovered'] ||
+                       raw['defensiveFumblesRecovered'] || 0);
+    const giveaways = (raw['interceptionsThrown'] || raw['passing.interceptions'] ||
+                       raw['passerInterceptions'] || 0) +
+                      (raw['fumblesLost'] || raw['rushing.fumblesLost'] ||
+                       raw['offensiveFumblesLost'] || 0);
+    to = Math.round(takeaways - giveaways);
+  }
+
+  // ── PASS / RUSH RANKINGS ─────────────────────────────────────────────
+  const passRnk = raw['netPassingYardsPerGame_rank']  || raw['passing.netPassingYardsPerGame_rank'] ||
+                  raw['passingYardsPerGame_rank']       || raw['passing.passingYardsPerGame_rank'] ||
+                  raw['netPassingYards_rank']           || 16;
+
+  const rushRnk = raw['rushingYardsPerGame_rank']     || raw['rushing.rushingYardsPerGame_rank'] ||
+                  raw['rushingYards_rank']              || 16;
+
+  const passDRnk= raw['passingYardsAllowedPerGame_rank']    ||
+                  raw['defensive.passingYardsAllowedPerGame_rank'] ||
+                  raw['netPassingYardsAllowedPerGame_rank']  ||
+                  raw['opponentPassingYardsPerGame_rank']    || 16;
+
+  const rushDRnk= raw['rushingYardsAllowedPerGame_rank']    ||
+                  raw['defensive.rushingYardsAllowedPerGame_rank'] ||
+                  raw['opponentRushingYardsPerGame_rank']    || 16;
+
+  // ── ADVANCED ─────────────────────────────────────────────────────────
+  const ypp      = parseFloat((raw['yardsPerPlay']       || raw['general.yardsPerPlay']  || 0).toFixed(2));
+  const netYPP   = parseFloat((raw['netYardsPerPlay']    || raw['yardsPerPlay'] || 0).toFixed(2));
+  const thirdPct = parseFloat((raw['thirdDownEff']       || raw['general.thirdDownEff']  ||
+                                raw['thirdDownConvPct']  || 0).toFixed(1));
+  const top      = raw['possessionTime'] || raw['general.possessionTime'] || raw['timeOfPossession'] || 0;
+
+  return { pf, pa, to, passRnk, rushRnk, passDRnk, rushDRnk, ypp, netYPP, thirdPct, top,
+           _pfPG: pfPG, _paPG: paPG, _pfTotal: pfTotal, _paTotal: paTotal }; // debug fields
+}
+
+function blendStats(cur, pre, prior, gpCur, gpPre, gpPrior, weights) {
+  // Parse each source with its own games-played count
+  const curP   = cur   ? parseStats(cur,   gpCur)   : null;
+  const preP   = pre   ? parseStats(pre,   gpPre)   : null;
+  const priorP = prior ? parseStats(prior, gpPrior) : null;
+
+  // Fallback chain if a source is missing
+  const w = { ...weights };
+  if (!preP)   { w.prior += w.pre;  w.pre = 0; }
+  if (!priorP) { w.cur   += w.prior + w.pre; w.prior = 0; w.pre = 0; }
+  if (!curP)   { w.prior += w.cur;  w.cur = 0; }
+
+  const total = w.prior + w.pre + w.cur;
+  if (total === 0) return curP || preP || priorP || null;
+
+  // Normalize weights
+  const wp = w.prior / total, wpr = w.pre / total, wc = w.cur / total;
+
+  function blendVal(field) {
+    let val = 0;
+    if (priorP && wp > 0) val += (priorP[field] || 0) * wp;
+    if (preP   && wpr> 0) val += (preP[field]  || 0) * wpr;
+    if (curP   && wc > 0) val += (curP[field]  || 0) * wc;
+    return val;
+  }
+
+  function blendRank(field) {
+    // Ranks: blend and round to nearest int, clamp 1-32
+    let val = 0;
+    if (priorP && wp > 0) val += (priorP[field] || 16) * wp;
+    if (preP   && wpr> 0) val += (preP[field]   || 16) * wpr;
+    if (curP   && wc > 0) val += (curP[field]   || 16) * wc;
+    return Math.min(32, Math.max(1, Math.round(val)));
+  }
+
+  return {
+    pf:       Math.round(blendVal('pf')),
+    pa:       Math.round(blendVal('pa')),
+    to:       Math.round(blendVal('to')),
+    passRnk:  blendRank('passRnk'),
+    rushRnk:  blendRank('rushRnk'),
+    passDRnk: blendRank('passDRnk'),
+    rushDRnk: blendRank('rushDRnk'),
+    ypp:      parseFloat(blendVal('ypp').toFixed(2)),
+    netYPP:   parseFloat(blendVal('netYPP').toFixed(2)),
+    thirdPct: parseFloat(blendVal('thirdPct').toFixed(1)),
+    top:      blendVal('top'),
+    blended:  true,
+    blendDesc: `Prior×${Math.round(wp*100)}% Pre×${Math.round(wpr*100)}% Cur×${Math.round(wc*100)}%`
+  };
+}
+
+async function fetchTeamStatsFull(abbr, year, week) {
+  const weights = BLEND_WEIGHTS[week] || null;
+  const gpCur   = Math.max(week - 1, 1);
+  const gpPre   = 4;
+  const gpPrior = 17;
+
+  if (!weights) {
+    const cur = await fetchRawStats(abbr, year, 2);
+    if (cur && abbr === [...Object.keys(TEAM_IDS)][0]) {
+      // Log first team's raw fields once so we can debug PA
+      const paFields = Object.keys(cur).filter(k => k.toLowerCase().includes('point') || k.toLowerCase().includes('allow') || k.toLowerCase().includes('score'));
+      console.log(`[ESPN Debug] ${abbr} ${year} stat fields related to points:`, paFields.slice(0, 20));
+      console.log(`[ESPN Debug] Sample values:`, paFields.slice(0,10).reduce((o,k)=>{o[k]=cur[k];return o;},{}));
+    }
+    return cur ? parseStats(cur, gpCur) : null;
+  }
+
+  const [cur, pre, prior] = await Promise.all([
+    weights.cur  > 0 ? fetchRawStats(abbr, year,      2) : Promise.resolve(null),
+    weights.pre  > 0 ? fetchRawStats(abbr, year,      1) : Promise.resolve(null),
+    weights.prior> 0 ? fetchRawStats(abbr, year - 1,  2) : Promise.resolve(null),
+  ]);
+
+  return blendStats(cur, pre, prior, gpCur, gpPre, gpPrior, weights);
+}
+
+// =====================================================================
+// FETCH WEEK
+// =====================================================================
+async function fetchWeek() {
+  curYear = parseInt(document.getElementById('yr').value);
+  curWeek = parseInt(document.getElementById('wk').value);
+  const btn = document.getElementById('fetch-btn');
+  btn.disabled = true; setDot('loading');
+  setStatus('fstatus', `Fetching Week ${curWeek} schedule...`, 's-load');
+
+  try {
+    const url = `${ESPN_SB}?dates=${curYear}&seasontype=2&week=${curWeek}&limit=25`;
+    const data = await apiFetch(url);
+    const events = data.events || [];
+    if (!events.length) {
+      setStatus('fstatus', `No games found for ${curYear} Week ${curWeek}.`, 's-err');
+      setDot('err'); btn.disabled = false; return;
+    }
+
+    // Collect teams
+    const teamsNeeded = new Set();
+    for (const ev of events) {
+      for (const c of ev.competitions[0].competitors)
+        teamsNeeded.add(c.team.abbreviation);
+    }
+
+    setStatus('fstatus', `Found ${events.length} games. Fetching stats for ${teamsNeeded.size} teams...`, 's-load');
+
+    const statsCache = {};
+    let i = 0;
+    const blendWeights = BLEND_WEIGHTS[curWeek];
+    const blendLabel = blendWeights ? blendWeights.label : 'Current Season Stats';
+
+    setStatus('fstatus', `Found ${events.length} games. Fetching ${blendWeights ? 'blended (early season)' : 'current season'} stats...`, 's-load');
+
+    for (const abbr of teamsNeeded) {
+      statsCache[abbr] = await fetchTeamStatsFull(abbr, curYear, curWeek);
+      i++;
+      setStatus('fstatus', `Loading stats: ${i}/${teamsNeeded.size} teams... [${blendLabel}]`, 's-load');
+      await sleep(100);
+    }
+
+    const existIds = new Set(wkGames().map(g => g.espnId));
+    let added = 0;
+
+    for (const ev of events) {
+      if (existIds.has(ev.id)) continue;
+      const comp = ev.competitions[0];
+      const hd = comp.competitors.find(c => c.homeAway === 'home');
+      const vd = comp.competitors.find(c => c.homeAway === 'away');
+      if (!hd || !vd) continue;
+
+      function pr(s) { const p=(s||'0-0').split('-'); return {w:+p[0]||0,l:+p[1]||0}; }
+      const oH = pr(hd.records?.find(r=>r.type==='total')?.summary);
+      const oV = pr(vd.records?.find(r=>r.type==='total')?.summary);
+      const hmH = pr(hd.records?.find(r=>r.type==='home')?.summary);
+      const rdV = pr(vd.records?.find(r=>r.type==='road')?.summary);
+
+      // Games played = weeks completed before this week.
+      // Week N means N-1 games have been played (we're predicting THIS week's game).
+      // Some teams may have had a bye — use record W+L as a cross-check,
+      // but cap at curWeek-1 since you can't have played more than that many games.
+      const gpFromRecord_H = oH.w + oH.l;
+      const gpFromRecord_V = oV.w + oV.l;
+      const gpExpected = Math.max(curWeek - 1, 1); // weeks completed
+      const gpH = Math.min(gpFromRecord_H > 0 ? gpFromRecord_H : gpExpected, gpExpected);
+      const gpV = Math.min(gpFromRecord_V > 0 ? gpFromRecord_V : gpExpected, gpExpected);
+
+      const odds = comp.odds?.[0];
+      let spread = null, ou = null;
+      if (odds) {
+        ou = odds.overUnder || null;
+        if (odds.homeTeamOdds?.favorite) spread = -(Math.abs(odds.spread||0));
+        else if (odds.awayTeamOdds?.favorite) spread = Math.abs(odds.spread||0);
+      }
+
+      const hS = statsCache[hd.team.abbreviation];
+      const vS = statsCache[vd.team.abbreviation];
+      const isEarlyBlend = !!blendWeights;
+
+      // Detect game day/time for situational rules
+      const gameDate = ev.date ? new Date(ev.date) : null;
+      const dayOfWeek = gameDate ? gameDate.getUTCDay() : null; // 0=sun,1=mon,4=thu
+
+      games.push({
+        id: Date.now()+Math.random(), espnId: ev.id,
+        week: curWeek, year: curYear, autoFetched: true,
+        gameDate: ev.date, dayOfWeek,
+        isDivisional: sameDivision(hd.team.abbreviation, vd.team.abbreviation),
+        blendLabel: isEarlyBlend ? blendLabel : null,
+        home: {
+          team: hd.team.abbreviation, fullName: hd.team.displayName,
+          gp: gpH, wins: oH.w, losses: oH.l, homeWins: hmH.w, homeLosses: hmH.l,
+          pf: hS?.pf||0, pa: hS?.pa||0, to: hS?.to||0,
+          passRnk: hS?.passRnk||16, rushRnk: hS?.rushRnk||16,
+          passDRnk: hS?.passDRnk||16, rushDRnk: hS?.rushDRnk||16,
+          ypp: hS?.ypp||0, netYPP: hS?.netYPP||0,
+          thirdPct: hS?.thirdPct||0, top: hS?.top||0,
+          statsAuto: !!hS, blendDesc: hS?.blendDesc||null
+        },
+        visitor: {
+          team: vd.team.abbreviation, fullName: vd.team.displayName,
+          gp: gpV, wins: oV.w, losses: oV.l, roadWins: rdV.w, roadLosses: rdV.l,
+          pf: vS?.pf||0, pa: vS?.pa||0, to: vS?.to||0,
+          passRnk: vS?.passRnk||16, rushRnk: vS?.rushRnk||16,
+          passDRnk: vS?.passDRnk||16, rushDRnk: vS?.rushDRnk||16,
+          ypp: vS?.ypp||0, netYPP: vS?.netYPP||0,
+          thirdPct: vS?.thirdPct||0, top: vS?.top||0,
+          statsAuto: !!vS, blendDesc: vS?.blendDesc||null
+        },
+        spread, ou, calc: null
+      });
+      added++;
+    }
+
+    persist(); renderGames();
+    setDot('ok');
+    const blendNote = blendWeights ? ` | ⚠ ${blendLabel}` : '';
+    setStatus('fstatus', `✓ Week ${curWeek} loaded — ${added} new games. Stats auto-filled.${blendNote} Enter spread/total then Calculate.`, 's-ok');
+  } catch(err) {
+    setDot('err');
+    setStatus('fstatus', `Error: ${err.message}`, 's-err');
+  }
+  btn.disabled = false;
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// =====================================================================
+// FORMULA — exact match to your spreadsheet
+// =====================================================================
+function rankPts(offRnk, defRnk) {
+  const diff = Math.abs(offRnk - defRnk);
+  const better = offRnk < defRnk; // lower rank # = better
+  let pts = diff <= 9 ? 1 : diff <= 19 ? 2 : 3;
+  return better ? pts : -pts;
+}
+
+function calcGame(g) {
+  const h = g.home, v = g.visitor;
+  if (!h.gp || !v.gp || !h.pf || !v.pf) return null;
+
+  const hPF = h.pf / h.gp;
+  const hPA = h.pa > 0 ? h.pa / h.gp : hPF * 0.95; // fallback: assume ~5% below own scoring
+  const vPF = v.pf / v.gp;
+  const vPA = v.pa > 0 ? v.pa / v.gp : vPF * 0.95;
+
+  // Guard: if any avg is 0 or negative, bail
+  if (hPF <= 0 || hPA <= 0 || vPF <= 0 || vPA <= 0) return null;
+
+  // Base score — your exact formula
+  let hBase, vBase;
+  if (hPF > vPA) hBase = (hPF - hPF / vPA) / 2;
+  else hBase = hPF + vPA / hPF;
+
+  if (hPA > vPF) vBase = vPF + hPA / vPF;
+  else vBase = (vPF - vPF / hPA) / 2;
+
+  // Ranking adjustments
+  const hPassAdj = rankPts(h.passRnk, v.passDRnk);
+  const hRushAdj = rankPts(h.rushRnk, v.rushDRnk);
+  const vPassAdj = rankPts(v.passRnk, h.passDRnk);
+  const vRushAdj = rankPts(v.rushRnk, h.rushDRnk);
+
+  let hScore = hBase + hPassAdj + hRushAdj;
+  let vScore = vBase + vPassAdj + vRushAdj;
+  hScore = Math.max(0, hScore);
+  vScore = Math.max(0, vScore);
+
+  const estSpread = hScore - vScore; // positive = home wins
+  const estTotal = hScore + vScore;
+
+  // Spread confidence (vs Vegas line if entered)
+  let spreadDiff = null, ouDiff = null, ouPick = null;
+  if (g.spread !== null && g.spread !== '') {
+    spreadDiff = Math.abs(estSpread - parseFloat(g.spread));
+  }
+  if (g.ou !== null && g.ou !== '') {
+    ouPick = estTotal > parseFloat(g.ou) ? 'OVER' : 'UNDER';
+    ouDiff = Math.abs(estTotal - parseFloat(g.ou));
+  }
+
+  const pickSide = estSpread >= 0 ? 'HOME' : 'VISITOR';
+  const pickTeam = estSpread >= 0 ? h.team : v.team;
+  const pickFull = estSpread >= 0 ? h.fullName : v.fullName;
+
+  // Is pick the underdog?
+  let isDog = false;
+  if (g.spread !== null && g.spread !== '') {
+    const sp = parseFloat(g.spread);
+    // negative spread = home is favorite
+    if (sp < 0 && pickSide === 'VISITOR') isDog = true;
+    if (sp > 0 && pickSide === 'HOME') isDog = true;
+    if (sp === 0) isDog = false;
+  }
+
+  // Situational alerts
+  const alerts = getSituationalAlerts(g, pickSide, spreadDiff);
+
+  return { hScore, vScore, estSpread, estTotal, spreadDiff, ouDiff,
+           pickSide, pickTeam, pickFull, ouPick, isDog, alerts };
+}
+
+// =====================================================================
+// SITUATIONAL ALERTS
+// =====================================================================
+function getSituationalAlerts(g, pickSide, spreadDiff) {
+  const alerts = [];
+  const wk = g.week;
+  const sp = g.spread !== null ? parseFloat(g.spread) : null;
+  const h = g.home, v = g.visitor;
+  const hWinPct = h.wins / Math.max(h.wins + h.losses, 1);
+  const vWinPct = v.wins / Math.max(v.wins + v.losses, 1);
+  const hHomeWinPct = h.homeWins / Math.max(h.homeWins + h.homeLosses, 1);
+  const vRoadWinPct = v.roadWins / Math.max(v.roadWins + v.roadLosses, 1);
+
+  // Divisional dog
+  if (g.isDivisional && sp !== null) {
+    if ((sp < 0 && pickSide === 'VISITOR') || (sp > 0 && pickSide === 'HOME')) {
+      if (wk === 1) alerts.push({t:'DIV DOG WK1', note:'Division dogs 57% ATS week 1'});
+    }
+  }
+
+  // 0-2 team situations (week 3)
+  if (wk === 3) {
+    if (h.wins === 0 && h.losses === 2) {
+      if (sp !== null && sp < 0 && Math.abs(sp) >= 5) alerts.push({t:'0-2 FAV 5+', note:'0-2 teams fav by 5+ wk3: 69% ATS'});
+      else if (sp !== null && sp < 0 && Math.abs(sp) < 5) alerts.push({t:'0-2 FAV <5', note:'0-2 teams fav by <5 wk3: 29% ATS — FADE'});
+      else alerts.push({t:'0-2 DOG WK3', note:'0-2 teams as dog wk3: 59% ATS'});
+    }
+    if (v.wins === 0 && v.losses === 2) {
+      alerts.push({t:'0-2 VISITOR', note:'Visiting 0-2 team wk3 — check line'});
+    }
+  }
+
+  // 2-0 vs 0-2
+  if (h.wins === 2 && h.losses === 0 && v.wins === 0 && v.losses === 2)
+    alerts.push({t:'2-0 v 0-2', note:'2-0 teams vs 0-2: 56% ATS'});
+
+  // Thursday game
+  if (g.dayOfWeek === 4) {
+    alerts.push({t:'THURSDAY', note:'Thu road dog — check travel miles (850+ = 40% ATS, <850 = 48%)'});
+  }
+
+  // Week 16-17 dogs
+  if ((wk === 16 || wk === 17) && sp !== null) {
+    const isDog17 = (sp < 0 && pickSide === 'VISITOR') || (sp > 0 && pickSide === 'HOME');
+    if (wk === 17) {
+      if (sp !== null && Math.abs(sp) >= 10) alerts.push({t:'WK17 DBL DIGIT', note:'Wk17 double digit fav: 13-6-1 ATS 68%'});
+      if (sp !== null && sp < 0 && Math.abs(sp) >= 3) alerts.push({t:'WK17 FAV -3+', note:'Wk17 fav -3 or more: 7-19 ATS — FADE'});
+      alerts.push({t:'WK17 ROAD', note:'Wk17 road teams: 58% ATS'});
+    }
+    if (isDog17 && wk === 16) alerts.push({t:'WK16 DOG', note:'Week 16 dogs: 56%+ ATS'});
+  }
+
+  // 9-10 point spread
+  if (sp !== null && Math.abs(sp) >= 9 && Math.abs(sp) <= 10)
+    alerts.push({t:'9-10 PT DOG', note:'9-10 pt spread dogs: 82% ATS'});
+
+  // Double digit away favorite
+  if (sp !== null && sp > 10 && pickSide === 'VISITOR')
+    alerts.push({t:'DBL DIGIT AWAY FAV', note:'Double digit away favorites: 84% ATS'});
+
+  // Line between -6 and +6
+  if (sp !== null && Math.abs(sp) <= 6)
+    alerts.push({t:'PICK WINNER', note:'Line -6 to +6: pick winner covers 89%+'});
+
+  // Home dog with winning home record
+  if (sp !== null && sp < 0 && hHomeWinPct > 0.5 && Math.abs(sp) <= 4)
+    alerts.push({t:'HOME DOG W-REC ≤4', note:'Home dog ≤4 with winning home record — check bye'});
+
+  // Road dog with winning road record
+  if (sp !== null && sp > 0 && vRoadWinPct > 0.5)
+    alerts.push({t:'ROAD DOG W-REC', note:'Road dog with winning road record: 55%+ cover'});
+
+  // Home underdog vs undefeated
+  if (h.wins > 0 && v.wins > 0 && v.losses === 0 && sp !== null && sp > 0 && hWinPct >= 0.5)
+    alerts.push({t:'HOME DOG v UNDEFEATED', note:'Home dog ≥.500 vs undefeated: 80% ATS'});
+
+  // Spread diff very close to key numbers
+  if (sp !== null) {
+    const keyNums = [3, 7, 6, 14, 10, 5, 8, 4, 1, 2, 17];
+    const absEst = Math.abs(parseFloat(g.spread) - (g.calc?.estSpread || 0));
+    for (const kn of keyNums) {
+      if (Math.abs(Math.abs(sp) - kn) <= 0.5)
+        alerts.push({t:`KEY # ${kn}`, note:`Spread lands on key number ${kn} — push risk`});
+    }
+  }
+
+  return alerts;
+}
+
+// =====================================================================
+// RANKING — 16 = most confident (LARGEST spread diff from Vegas), 1 = least
+// Largest diff = your model disagrees most with the market = strongest conviction
+// =====================================================================
+function rankGames(gs) {
+  const calculated = gs.filter(g => g.calc && g.calc.spreadDiff !== null);
+  // Sort ascending by spreadDiff — smallest diff gets rank 1, largest gets rank N (most confident)
+  const sorted = [...calculated].sort((a, b) => a.calc.spreadDiff - b.calc.spreadDiff);
+  sorted.forEach((g, i) => { g.calc.rank = i + 1; }); // 1 = smallest diff (least confident), N = largest (most)
+  return sorted;
+}
+
+// =====================================================================
+// CALCULATE ALL
+// =====================================================================
+function calcAll() {
+  const gs = wkGames();
+  gs.forEach(g => { g.calc = calcGame(g); });
+  // Rank
+  const calculated = gs.filter(g => g.calc && g.calc.spreadDiff !== null);
+  if (calculated.length) {
+    // Ascending sort: smallest diff = rank 1 (least confident), largest diff = rank N (most confident = highest pts)
+    const sorted = [...calculated].sort((a, b) => (a.calc.spreadDiff||0) - (b.calc.spreadDiff||0));
+    sorted.forEach((g, i) => { g.calc.rank = i + 1; });
+  }
+  // Games without spread get no rank or equal middle
+  const noSpread = gs.filter(g => g.calc && g.calc.spreadDiff === null);
+  noSpread.forEach(g => { g.calc.rank = null; });
+  persist(); renderGames(); renderRanked(); renderResultsForm();
+}
+
+// =====================================================================
+// GETTERS
+// =====================================================================
+function wkGames() {
+  return games.filter(g => g.week === curYear_wk().week && g.year === curYear_wk().year);
+}
+function curYear_wk() {
+  return { year: parseInt(document.getElementById('yr')?.value||curYear), week: parseInt(document.getElementById('wk')?.value||curWeek) };
+}
+function clearWeek() {
+  const {year, week} = curYear_wk();
+  if (!confirm(`Clear all games for Week ${week} — ${year}?`)) return;
+  games = games.filter(g => !(g.week === week && g.year === year));
+  persist();
+  renderGames();
+  document.getElementById('ranked-section').style.display = 'none';
+  setStatus('fstatus', `Week ${week} cleared.`, 's-ok');
+}
+function upd(id, side, field, val) {
+  const g = games.find(g=>g.id===id); if(!g) return;
+  const n = parseFloat(val); g[side][field] = isNaN(n)?val:n; g.calc=null; persist();
+  // Live recalc
+  const ng = games.find(g=>g.id===id);
+  ng.calc = calcGame(ng);
+  // Re-rank all
+  calcAll();
+}
+function updTop(id, field, val) {
+  const g = games.find(g=>g.id===id); if(!g) return;
+  const n = parseFloat(val);
+  g[field] = isNaN(n) ? (val===''?null:val) : n;
+  g.calc = null; persist(); calcAll();
+}
+function removeGame(id) { games=games.filter(g=>g.id!==id); persist(); renderGames(); }
+
+// =====================================================================
+// RENDER GAMES
+// =====================================================================
+function changeWeek() {
+  const y = parseInt(document.getElementById('yr').value);
+  const w = parseInt(document.getElementById('wk').value);
+  curYear = y; curWeek = w; persist(); renderGames(); renderResultsForm();
+}
+
+function renderGames() {
+  const gs = wkGames();
+  const wrap = document.getElementById('games-wrap');
+  if (!gs.length) {
+    wrap.innerHTML = '<div class="empty"><strong>No Games Loaded</strong>Click "Fetch Games + Stats" to auto-load this week\'s matchups from ESPN.<br>All stats will be filled automatically.</div>';
+    document.getElementById('ranked-section').style.display = 'none'; return;
+  }
+  wrap.innerHTML = gs.map(g => gameCard(g)).join('');
+}
+
+function gameCard(g) {
+  const c = g.calc;
+  const rank = c?.rank;
+  const rankClass = !rank ? 'r-lo' : rank >= 14 ? 'r16' : rank >= 10 ? 'r-hi' : rank >= 6 ? 'r-mid' : 'r-lo';
+  const dcClass = !c?.spreadDiff ? '' : c.spreadDiff >= 7 ? 'diff-0' : c.spreadDiff >= 3 ? 'diff-1' : 'diff-2';
+  const spVal = g.spread !== null && g.spread !== '' ? parseFloat(g.spread) : null;
+  const spLabel = spVal === null ? '—' : spVal < 0 ? `${g.visitor.team} -${Math.abs(spVal).toFixed(1)}` : spVal > 0 ? `${g.home.team} -${spVal.toFixed(1)}` : "Pick'em";
+
+  const alerts = c?.alerts || [];
+
+  return `<div class="game-card">
+    <div class="gc-head">
+      <div class="gc-rank ${rankClass}">${rank||'—'}</div>
+      <div>
+        <div class="gc-matchup">
+          <span style="color:var(--blue2)">${g.home.fullName||g.home.team}</span>
+          <span class="gc-vs">vs</span>
+          <span style="color:var(--purple)">${g.visitor.fullName||g.visitor.team}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px">
+          Wk ${g.week} · ${g.year} · ${g.autoFetched?'<span class="b-esp stag">ESPN</span>':'Manual'}
+          ${g.isDivisional?'· <span style="color:var(--yellow)">DIVISION</span>':''}
+          ${g.blendLabel?`· <span style="color:var(--manual-t);background:var(--manual);border-radius:3px;padding:1px 5px">⚗ BLENDED</span>`:''}
+        </div>
+      </div>
+      <div class="gc-badges">
+        ${c ? `<span class="badge ${c.pickSide==='HOME'?'b-home':'b-vis'}">${c.pickFull||c.pickTeam}</span>` : ''}
+        ${c?.isDog ? '<span class="badge b-dog">🐕 DOG</span>' : ''}
+        ${c?.ouPick ? `<span class="badge ${c.ouPick==='OVER'?'b-over':'b-under'}">${c.ouPick}</span>` : ''}
+      </div>
+      <button onclick="removeGame(${g.id})" class="btn-red btn-sm" style="margin-left:6px">✕</button>
+    </div>
+    <div class="gc-body">
+      <div class="tgrid">${teamBlock(g,'home')}${teamBlock(g,'visitor')}</div>
+      <div class="gc-bottom">
+        <div class="sg"><label>Spread <span class="stag st-m">your book</span></label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="number" value="${g.spread??''}" step="0.5" placeholder="e.g. -3" onchange="updTop(${g.id},'spread',this.value)" style="width:80px">
+            <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">${spLabel}</span>
+          </div>
+        </div>
+        <div class="sg"><label>Total <span class="stag st-m">your book</span></label>
+          <input type="number" value="${g.ou??''}" step="0.5" placeholder="e.g. 45" onchange="updTop(${g.id},'ou',this.value)" style="width:80px">
+        </div>
+        ${c && c.hScore != null ? `<div class="gc-result">
+          <div class="rval"><div class="rl">Est. Score</div>
+            <div class="rv">${(c.hScore||0).toFixed(1)} — ${(c.vScore||0).toFixed(1)}</div></div>
+          ${c.spreadDiff!=null?`<div class="rval"><div class="rl">Spread Diff</div>
+            <div class="rv ${dcClass}">${(c.spreadDiff||0).toFixed(2)}</div></div>`:''}
+          ${c.ouDiff!=null?`<div class="rval"><div class="rl">Total Diff</div>
+            <div class="rv" style="color:var(--text2)">${(c.ouDiff||0).toFixed(1)}</div></div>`:''}
+        </div>` : ''}
+      </div>
+      ${alerts.length ? `<div class="alerts-row">${alerts.map(a=>`<span class="alert-badge" title="${a.note}">⚡ ${a.t}</span>`).join('')}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function teamBlock(g, side) {
+  const t = g[side], h = side === 'home';
+  const rec = h ? `${t.homeWins||0}-${t.homeLosses||0} home` : `${t.roadWins||0}-${t.roadLosses||0} road`;
+  const auto = t.statsAuto;
+  return `<div class="tblock ${side}">
+    <div class="tname">${h?'🏠':'✈'} ${t.fullName||t.team}
+      <span class="trec">${rec}</span>
+      ${t.blendDesc?`<span style="font-size:9px;color:var(--manual-t);font-family:'DM Mono',monospace;margin-left:4px" title="${t.blendDesc}">⚗</span>`:''}
+    </div>
+    <div class="srow"><label>GP <span class="stag st-a">auto</span></label>
+      <input type="number" value="${t.gp}" min="1" max="18" onchange="upd(${g.id},'${side}','gp',this.value)"></div>
+    <div class="srow"><label>Season PF ${auto?'<span class="stag st-a">auto</span>':''}</label>
+      <input type="number" value="${t.pf}" onchange="upd(${g.id},'${side}','pf',this.value)" placeholder="0"
+        style="${!t.pf?'border-color:var(--red);':''}" title="${!t.pf?'⚠ PF not loaded':'PF loaded OK'}"></div>
+    <div class="srow"><label>Season PA ${auto?'<span class="stag st-a">auto</span>':''}</label>
+      <input type="number" value="${t.pa}" onchange="upd(${g.id},'${side}','pa',this.value)" placeholder="0"
+        style="${!t.pa?'border-color:var(--red);':''}" title="${!t.pa?'⚠ PA not loaded — enter manually':'PA loaded OK'}"></div>
+    <div class="srow"><label>TO Ratio ${auto?'<span class="stag st-a">auto</span>':''}</label>
+      <input type="number" value="${t.to}" min="-25" max="25" onchange="upd(${g.id},'${side}','to',this.value)" placeholder="0"></div>
+    <div class="divlabel">Rankings (1=best) ${auto?'<span class="stag st-a">auto</span>':''}</div>
+    <div class="srow"><label>Pass Off</label>
+      <input type="number" value="${t.passRnk}" min="1" max="32" onchange="upd(${g.id},'${side}','passRnk',this.value)"></div>
+    <div class="srow"><label>Rush Off</label>
+      <input type="number" value="${t.rushRnk}" min="1" max="32" onchange="upd(${g.id},'${side}','rushRnk',this.value)"></div>
+    <div class="srow"><label>Pass Def</label>
+      <input type="number" value="${t.passDRnk}" min="1" max="32" onchange="upd(${g.id},'${side}','passDRnk',this.value)"></div>
+    <div class="srow"><label>Rush Def</label>
+      <input type="number" value="${t.rushDRnk}" min="1" max="32" onchange="upd(${g.id},'${side}','rushDRnk',this.value)"></div>
+    <div class="divlabel">Advanced ${auto?'<span class="stag st-a">auto</span>':''}</div>
+    <div class="srow"><label>Yds/Play</label>
+      <input type="number" value="${t.ypp||''}" step="0.01" onchange="upd(${g.id},'${side}','ypp',this.value)" placeholder="5.5"></div>
+    <div class="srow"><label>3rd Dn %</label>
+      <input type="number" value="${t.thirdPct||''}" step="0.1" onchange="upd(${g.id},'${side}','thirdPct',this.value)" placeholder="42.0"></div>
+  </div>`;
+}
+
+// =====================================================================
+// RANKED OUTPUT
+// =====================================================================
+function renderRanked() {
+  const gs = wkGames().filter(g => g.calc);
+  if (!gs.length) { document.getElementById('ranked-section').style.display='none'; return; }
+  document.getElementById('ranked-section').style.display = 'block';
+
+  // Sort by rank descending (16 first = most confident)
+  const sorted = [...gs].sort((a,b) => (b.calc.rank||0) - (a.calc.rank||0));
+  const n = sorted.length;
+
+  document.getElementById('ranked-body').innerHTML = sorted.map((g,i) => {
+    const c = g.calc;
+    const r = c.rank || '—';
+    const isTop = r >= n - 2;
+    const rnClass = r===n?'rn-gold':r===n-1?'rn-silver':r===n-2?'rn-bronze':r>=Math.ceil(n*.6)?'rn-hi':r>=Math.ceil(n*.3)?'rn-mid':'rn-lo';
+    const dcClass = !c.spreadDiff?'':c.spreadDiff>=7?'diff-0':c.spreadDiff>=3?'diff-1':'diff-2';
+    const spLabel = g.spread!==null&&g.spread!==''?
+      (parseFloat(g.spread)<0?`${g.visitor.team} -${Math.abs(g.spread).toFixed(1)}`:parseFloat(g.spread)>0?`${g.home.team} -${parseFloat(g.spread).toFixed(1)}`:"Pick'em"):'—';
+    return `<tr>
+      <td><span class="rnum ${rnClass}">${r}</span></td>
+      <td style="font-weight:700;font-family:'DM Mono',monospace">${g.home.team} vs ${g.visitor.team}</td>
+      <td><span class="badge ${c.pickSide==='HOME'?'b-home':'b-vis'}">${c.pickTeam}</span></td>
+      <td>${c.isDog?'<span class="badge b-dog">🐕 DOG</span>':''}</td>
+      <td style="font-family:'DM Mono',monospace">${(c.hScore||0).toFixed(1)} — ${(c.vScore||0).toFixed(1)}</td>
+      <td><span class="${dcClass}">${c.spreadDiff!=null?(c.spreadDiff||0).toFixed(2):'—'}</span></td>
+      <td>${c.ouPick?`<span class="badge ${c.ouPick==='OVER'?'b-over':'b-under'}">${c.ouPick}</span>`:'—'}</td>
+      <td style="font-family:'DM Mono',monospace">${(c.estTotal||0).toFixed(1)} ${g.ou?`(${g.ou})`:'(no line)'}</td>
+      <td>${(c.alerts||[]).map(a=>`<span class="alert-badge" title="${a.note}">⚡${a.t}</span>`).join(' ')}</td>
+    </tr>`;
+  }).join('');
+}
+
+// =====================================================================
+// RESULTS
+// =====================================================================
+function renderResultsForm() {
+  const {year, week} = curYear_wk();
+  document.getElementById('res-wk').textContent = `${week} — ${year}`;
+  const gs = wkGames().filter(g => g.calc);
+  const cf = document.getElementById('res-form');
+  if (!gs.length) { cf.innerHTML='<div class="empty"><strong>No Calculated Games</strong>Fetch and calculate first.</div>'; return; }
+  const wk = `${year}_w${week}`;
+  const saved = (history[wk]?.games) || {};
+
+  cf.innerHTML = gs.sort((a,b)=>(b.calc.rank||0)-(a.calc.rank||0)).map(g => {
+    const r = saved[g.id] || {}, c = g.calc;
+    const spLabel = g.spread!==null&&g.spread!==''?
+      (parseFloat(g.spread)<0?`${g.visitor.team} -${Math.abs(g.spread).toFixed(1)}`:parseFloat(g.spread)>0?`${g.home.team} -${parseFloat(g.spread).toFixed(1)}`:"Pick'em"):'';
+    return `<div class="res-block">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--gold)">
+          ${c.rank?`<span style="color:var(--text3)">#${c.rank}</span> `:''}${g.home.team} vs ${g.visitor.team}
+        </span>
+        <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">
+          Pick: <strong style="color:var(--blue2)">${c.pickTeam}</strong>${c.isDog?' 🐕':''} · ${spLabel}
+          ${c.ouPick?`· O/U: <strong>${c.ouPick}</strong>`:''}
+        </span>
+        ${r.pickResult?`<span class="badge b-${r.pickResult==='COVER'?'win':r.pickResult==='PUSH'?'push':'lose'}">${r.pickResult}</span>`:''}
+        ${r.ouResult?`<span class="badge b-${r.ouResult==='WIN'?'win':r.ouResult==='PUSH'?'push':'lose'}">O/U: ${r.ouResult}</span>`:''}
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div class="cg"><label>${g.home.team} Score</label>
+          <input type="number" id="rh_${g.id}" value="${r.hScore??''}" placeholder="0" style="width:80px"></div>
+        <div class="cg"><label>${g.visitor.team} Score</label>
+          <input type="number" id="rv_${g.id}" value="${r.vScore??''}" placeholder="0" style="width:80px"></div>
+      </div>
+    </div>`;
+  }).join('') + `<button class="btn-gold" onclick="saveResults()" style="margin-top:12px">✓ Save All Results</button>`;
+}
+
+function saveResults() {
+  const {year, week} = curYear_wk();
+  const gs = wkGames().filter(g => g.calc);
+  const wk = `${year}_w${week}`;
+  if (!history[wk]) history[wk] = {meta:{week,year,source:'manual'},games:{}};
+  gs.forEach(g => {
+    const hs = parseFloat(document.getElementById(`rh_${g.id}`)?.value);
+    const vs = parseFloat(document.getElementById(`rv_${g.id}`)?.value);
+    if (!isNaN(hs) && !isNaN(vs)) {
+      const c = g.calc;
+      const actualSpread = hs - vs;
+      const sp = g.spread !== null ? parseFloat(g.spread) : null;
+      let pickResult = 'N/A';
+      if (sp !== null) {
+        const diff = actualSpread - sp;
+        if (Math.abs(diff) < 0.1) pickResult = 'PUSH';
+        else if ((c.pickSide==='HOME' && actualSpread > sp)||(c.pickSide==='VISITOR' && actualSpread < sp)) pickResult = 'COVER';
+        else pickResult = 'LOSE';
+      }
+      let ouResult = null;
+      if (g.ou !== null) {
+        const tot = hs + vs;
+        const line = parseFloat(g.ou);
+        ouResult = Math.abs(tot-line)<0.1?'PUSH':tot>line?'WIN':'LOSE';
+      }
+      history[wk].games[g.id] = {hScore:hs,vScore:vs,pickResult,ouResult,rank:c.rank,isDog:c.isDog};
+    }
+  });
+  persist(); renderRecord(); renderResultsForm(); updateHeader();
+  alert('✓ Results saved!');
+}
+
+// =====================================================================
+// RECORD
+// =====================================================================
+function calcTotals(src) {
+  let W=0,L=0,P=0,ouW=0,ouL=0,ouP=0,wks=0;
+  const tierData = {'1-5':{W:0,L:0},'6-10':{W:0,L:0},'11-16':{W:0,L:0}};
+  Object.values(history).forEach(wd => {
+    if (!wd.games||!Object.keys(wd.games).length) return;
+    if (src && wd.meta?.source !== src) return;
+    wks++;
+    Object.values(wd.games).forEach(r => {
+      if (r.pickResult==='COVER') W++;
+      else if (r.pickResult==='LOSE') L++;
+      else if (r.pickResult==='PUSH') P++;
+      if (r.ouResult==='WIN') ouW++;
+      else if (r.ouResult==='LOSE') ouL++;
+      else if (r.ouResult==='PUSH') ouP++;
+      // Tier
+      const rk = r.rank || 0;
+      const tier = rk<=5?'1-5':rk<=10?'6-10':'11-16';
+      if (r.pickResult==='COVER') tierData[tier].W++;
+      else if (r.pickResult==='LOSE') tierData[tier].L++;
+    });
+  });
+  return {W,L,P,ouW,ouL,ouP,wks,tierData};
+}
+
+function updateHeader() {
+  const {W,L,P,wks} = calcTotals();
+  const eff = W+L, pct = eff>0?((W/eff)*100).toFixed(1):'—';
+  document.getElementById('h-pct').textContent = eff>0?pct+'%':'—';
+  document.getElementById('h-w').textContent = W;
+  document.getElementById('h-l').textContent = L;
+  document.getElementById('h-wks').textContent = wks;
+}
+
+function renderRecord() {
+  const {W,L,P,ouW,ouL,ouP,wks,tierData} = calcTotals();
+  const eff=W+L, pct=eff>0?((W/eff)*100).toFixed(1):0;
+  const ouEff=ouW+ouL, opct=ouEff>0?((ouW/ouEff)*100).toFixed(1):0;
+  const pctCol = pct>=56?'var(--green)':pct>=52?'var(--gold2)':pct>=48?'var(--text)':'var(--red)';
+
+  document.getElementById('rec-cards').innerHTML = `
+    <div class="scard"><div class="sl">Win %</div><div class="sv" style="color:${pctCol}">${pct}%</div>
+      <div class="pbar"><div class="pfill pfill-g" style="width:${pct}%"></div></div>
+      <div class="ss">${W}W / ${L}L / ${P}P</div></div>
+    <div class="scard"><div class="sl">Total Picks</div><div class="sv">${W+L+P}</div></div>
+    <div class="scard"><div class="sl">Wins</div><div class="sv" style="color:var(--green)">${W}</div></div>
+    <div class="scard"><div class="sl">Losses</div><div class="sv" style="color:var(--red)">${L}</div></div>
+    <div class="scard"><div class="sl">O/U Win %</div><div class="sv">${opct}%</div>
+      <div class="pbar"><div class="pfill pfill-b" style="width:${opct}%"></div></div>
+      <div class="ss">${ouW}W / ${ouL}L / ${ouP}P</div></div>
+    <div class="scard"><div class="sl">Weeks</div><div class="sv">${wks}</div></div>`;
+
+  // Tier cards
+  const tierLabels = [
+    ['1-5','Least Confident','You assign these lower-value picks'],
+    ['6-10','Mid Confidence','Middle of the pack'],
+    ['11-16','Most Confident','Your best bets — target 56%+'],
+  ];
+  document.getElementById('tier-cards').innerHTML = tierLabels.map(([key,label,desc]) => {
+    const t = tierData[key]; const te = t.W+t.L;
+    const tp = te>0?((t.W/te)*100).toFixed(1):0;
+    const tc = tp>=56?'var(--green)':tp>=50?'var(--gold2)':'var(--red)';
+    return `<div class="tier-card">
+      <div class="tc-label">${label}</div>
+      <div class="tc-range">Rank ${key}</div>
+      <div class="tc-pct" style="color:${tc}">${tp}%</div>
+      <div class="tc-rec">${t.W}W / ${t.L}L · ${desc}</div>
+    </div>`;
+  }).join('');
+
+  // History table
+  const rows = [];
+  Object.entries(history).sort((a,b)=>a[0]>b[0]?1:-1).forEach(([wk,wd]) => {
+    if (!wd.games) return;
+    let W2=0,L2=0,P2=0,oW=0,oL=0,oP=0;
+    const t1={W:0,L:0},t2={W:0,L:0},t3={W:0,L:0};
+    Object.values(wd.games).forEach(r => {
+      if(r.pickResult==='COVER')W2++;else if(r.pickResult==='LOSE')L2++;else if(r.pickResult==='PUSH')P2++;
+      if(r.ouResult==='WIN')oW++;else if(r.ouResult==='LOSE')oL++;else if(r.ouResult==='PUSH')oP++;
+      const rk=r.rank||0,tier=rk<=5?t1:rk<=10?t2:t3;
+      if(r.pickResult==='COVER')tier.W++;else if(r.pickResult==='LOSE')tier.L++;
+    });
+    const m=wd.meta||{};
+    const tot=W2+L2+P2, pc=tot>0?((W2/Math.max(W2+L2,1))*100).toFixed(1):'-';
+    const ot=oW+oL+oP, op=ot>0?((oW/Math.max(oW+oL,1))*100).toFixed(1):'-';
+    const pcc=parseFloat(pc)>=56?'pct-hi':parseFloat(pc)>=50?'pct-mid':'pct-lo';
+    const t1p=t1.W+t1.L>0?((t1.W/(t1.W+t1.L))*100).toFixed(0)+`% (${t1.W}-${t1.L})`:'-';
+    const t2p=t2.W+t2.L>0?((t2.W/(t2.W+t2.L))*100).toFixed(0)+`% (${t2.W}-${t2.L})`:'-';
+    const t3p=t3.W+t3.L>0?((t3.W/(t3.W+t3.L))*100).toFixed(0)+`% (${t3.W}-${t3.L})`:'-';
+    rows.push(`<tr>
+      <td style="color:var(--gold);font-family:'Bebas Neue',sans-serif">${m.year||''}</td>
+      <td>${m.week||wk}</td><td>${tot}</td>
+      <td class="wc">${W2}</td><td class="lc">${L2}</td><td class="pc">${P2}</td>
+      <td class="${pcc}">${pc}%</td>
+      <td style="color:var(--text3);font-size:11px">${t1p}</td>
+      <td style="color:var(--text3);font-size:11px">${t2p}</td>
+      <td style="color:${parseFloat(t3p)>=56?'var(--green)':'var(--text3)'};font-size:11px">${t3p}</td>
+      <td style="color:var(--text3);font-size:10px">${m.source||'manual'}</td>
+    </tr>`);
+  });
+  document.getElementById('hist-body').innerHTML = rows.length?rows.join(''):
+    '<tr><td colspan="11" style="color:var(--text3);text-align:center;padding:20px;font-family:\'DM Mono\',monospace">No results recorded yet.</td></tr>';
+  updateHeader();
+}
+
+function exportCSV() {
+  let csv = 'Year,Week,Games,Wins,Losses,Pushes,WinPct,OUWins,OULosses,OUPct,Tier1-5,Tier6-10,Tier11-16,Source\n';
+  Object.entries(history).sort().forEach(([wk,wd]) => {
+    if (!wd.games) return;
+    let W=0,L=0,P=0,oW=0,oL=0,oP=0;
+    const t1={W:0,L:0},t2={W:0,L:0},t3={W:0,L:0};
+    Object.values(wd.games).forEach(r => {
+      if(r.pickResult==='COVER')W++;else if(r.pickResult==='LOSE')L++;else P++;
+      if(r.ouResult==='WIN')oW++;else if(r.ouResult==='LOSE')oL++;else oP++;
+      const rk=r.rank||0,t=rk<=5?t1:rk<=10?t2:t3;
+      if(r.pickResult==='COVER')t.W++;else t.L++;
+    });
+    const m=wd.meta||{},tot=W+L+P,pc=tot>0?((W/Math.max(W+L,1))*100).toFixed(1):0;
+    const op=oW+oL>0?((oW/(oW+oL))*100).toFixed(1):0;
+    const tp = t=>t.W+t.L>0?((t.W/(t.W+t.L))*100).toFixed(1)+'%':'-';
+    csv+=`${m.year||''},${m.week||''},${tot},${W},${L},${P},${pc},${oW},${oL},${op},${tp(t1)},${tp(t2)},${tp(t3)},${m.source||'manual'}\n`;
+  });
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=`nfl_predictor_history.csv`; a.click();
+}
+
+function clearHistory() {
+  if (!confirm('Clear ALL history? This cannot be undone.')) return;
+  history={}; persist(); renderRecord(); updateHeader();
+}
+
+// =====================================================================
+// BACKFILL
+// =====================================================================
+async function startBackfill() {
+  const from = parseInt(document.getElementById('bf-from').value);
+  const to = parseInt(document.getElementById('bf-to').value);
+  if (from > to) { alert('From must be ≤ To year'); return; }
+  bfStop = false;
+  document.getElementById('bf-btn').disabled = true;
+  const prog = document.getElementById('bf-progress');
+  prog.innerHTML = '';
+
+  for (let yr = from; yr <= to && !bfStop; yr++) {
+    const card = document.createElement('div');
+    card.className = 'bf-card'; card.id = `bfc-${yr}`;
+    card.innerHTML = `<div class="bf-year">${yr}</div><div class="bf-stat" id="bfs-${yr}">Starting...</div><div class="prgbar"><div class="prgfill" id="bfp-${yr}" style="width:0%"></div></div>`;
+    prog.appendChild(card);
+    await backfillYear(yr);
+    renderBfResults(); renderRecord(); updateHeader();
+  }
+
+  document.getElementById('bf-btn').disabled = false;
+  setStatus('bf-status', bfStop ? 'Stopped.' : `✓ Backfill complete!`, bfStop?'s-err':'s-ok');
+}
+
+async function backfillYear(yr) {
+  const statEl = document.getElementById(`bfs-${yr}`);
+  const prgEl = document.getElementById(`bfp-${yr}`);
+
+  for (let wk = 1; wk <= 18 && !bfStop; wk++) {
+    if (statEl) statEl.textContent = `Week ${wk}/18...`;
+    if (prgEl) prgEl.style.width = `${(wk/18)*100}%`;
+
+    const wkKey = `${yr}_w${wk}`;
+    if (history[wkKey]?.meta?.source === 'manual') continue;
+
+    try {
+      const url = `${ESPN_SB}?dates=${yr}&seasontype=2&week=${wk}&limit=25`;
+      const data = await apiFetch(url);
+      const events = data.events || [];
+      if (!events.length) continue;
+
+      const wkGamesData = {};
+      let W=0,L=0,P=0,ouW=0,ouL=0,ouP=0;
+
+      for (const ev of events) {
+        if (bfStop) break;
+        const comp = ev.competitions[0];
+        if (!comp.status?.type?.completed) continue;
+        const hd = comp.competitors.find(c=>c.homeAway==='home');
+        const vd = comp.competitors.find(c=>c.homeAway==='away');
+        if (!hd||!vd) continue;
+        const hs = parseFloat(hd.score)||0;
+        const vs = parseFloat(vd.score)||0;
+
+        function pr(s){const p=(s||'0-0').split('-');return{w:+p[0]||0,l:+p[1]||0};}
+        const oH=pr(hd.records?.find(r=>r.type==='total')?.summary);
+        const oV=pr(vd.records?.find(r=>r.type==='total')?.summary);
+        // Games played = weeks completed before this week, capped by record
+        const gpExpected = Math.max(wk - 1, 1);
+        const gpH = Math.min(oH.w+oH.l > 0 ? oH.w+oH.l : gpExpected, gpExpected);
+        const gpV = Math.min(oV.w+oV.l > 0 ? oV.w+oV.l : gpExpected, gpExpected);
+
+        const odds=comp.odds?.[0];
+        let spread=null,ou=null;
+        if(odds){ou=odds.overUnder||null;spread=odds.homeTeamOdds?.favorite?-(Math.abs(odds.spread||0)):Math.abs(odds.spread||0);}
+
+        const hStats = await fetchTeamStatsFull(hd.team.abbreviation, yr, wk);
+        const vStats = await fetchTeamStatsFull(vd.team.abbreviation, yr, wk);
+
+        const tmpGame={
+          week:wk, year:yr, isDivisional:sameDivision(hd.team.abbreviation,vd.team.abbreviation),
+          dayOfWeek:new Date(ev.date).getUTCDay(), spread, ou,
+          home:{gp:gpH,wins:oH.w,losses:oH.l,homeWins:0,homeLosses:0,
+            pf:hStats?.pf||0,pa:hStats?.pa||0,to:hStats?.to||0,
+            passRnk:hStats?.passRnk||16,rushRnk:hStats?.rushRnk||16,
+            passDRnk:hStats?.passDRnk||16,rushDRnk:hStats?.rushDRnk||16,
+            ypp:hStats?.ypp||0,thirdPct:hStats?.thirdPct||0},
+          visitor:{gp:gpV,wins:oV.w,losses:oV.l,roadWins:0,roadLosses:0,
+            pf:vStats?.pf||0,pa:vStats?.pa||0,to:vStats?.to||0,
+            passRnk:vStats?.passRnk||16,rushRnk:vStats?.rushRnk||16,
+            passDRnk:vStats?.passDRnk||16,rushDRnk:vStats?.rushDRnk||16,
+            ypp:vStats?.ypp||0,thirdPct:vStats?.thirdPct||0}
+        };
+
+        const c = calcGame(tmpGame);
+        if (!c||c.spreadDiff===null) continue;
+
+        const actualSpread=hs-vs;
+        let pr2='N/A';
+        if(spread!==null){
+          const diff=actualSpread-spread;
+          if(Math.abs(diff)<0.1)pr2='PUSH';
+          else if((c.pickSide==='HOME'&&actualSpread>spread)||(c.pickSide==='VISITOR'&&actualSpread<spread))pr2='COVER';
+          else pr2='LOSE';
+        }
+        let ouR=null;
+        if(ou!==null){const tot=hs+vs;ouR=Math.abs(tot-ou)<0.1?'PUSH':tot>ou?'WIN':'LOSE';}
+
+        if(pr2==='COVER')W++;else if(pr2==='LOSE')L++;else if(pr2==='PUSH')P++;
+        if(ouR==='WIN')ouW++;else if(ouR==='LOSE')ouL++;else if(ouR==='PUSH')ouP++;
+        wkGamesData[ev.id]={hScore:hs,vScore:vs,pickResult:pr2,ouResult:ouR,rank:null,isDog:c.isDog};
+      }
+
+      if(Object.keys(wkGamesData).length){
+        history[wkKey]={meta:{week:wk,year:yr,source:'backfill'},games:wkGamesData};
+      }
+      persist();
+      await sleep(150);
+    } catch(e){ await sleep(500); }
+  }
+
+  if(statEl){
+    const tot=Object.values(history).filter(w=>w.meta?.year===yr&&w.meta?.source==='backfill')
+      .flatMap(w=>Object.values(w.games||{}));
+    const W=tot.filter(r=>r.pickResult==='COVER').length;
+    const L=tot.filter(r=>r.pickResult==='LOSE').length;
+    const pct=W+L>0?((W/(W+L))*100).toFixed(1):0;
+    statEl.innerHTML=`Done — <span style="color:var(--green)">${W}W</span>/<span style="color:var(--red)">${L}L</span> = <strong style="color:var(--gold)">${pct}%</strong>`;
+  }
+  if(prgEl) prgEl.style.width='100%';
+}
+
+function renderBfResults() {
+  const byYear = {};
+  Object.entries(history).forEach(([wk,wd])=>{
+    if(!wd.meta?.year||wd.meta?.source!=='backfill') return;
+    const y=wd.meta.year;
+    if(!byYear[y]) byYear[y]={wks:0,W:0,L:0,P:0,ouW:0,ouL:0};
+    byYear[y].wks++;
+    Object.values(wd.games||{}).forEach(r=>{
+      if(r.pickResult==='COVER')byYear[y].W++;else if(r.pickResult==='LOSE')byYear[y].L++;else byYear[y].P++;
+      if(r.ouResult==='WIN')byYear[y].ouW++;else if(r.ouResult==='LOSE')byYear[y].ouL++;
+    });
+  });
+  const tbody=document.getElementById('bf-results');
+  if(!tbody) return;
+  const rows=Object.entries(byYear).sort((a,b)=>a[0]-b[0]).map(([y,d])=>{
+    const eff=d.W+d.L, pct=eff>0?((d.W/eff)*100).toFixed(1):0;
+    const oeff=d.ouW+d.ouL, opct=oeff>0?((d.ouW/oeff)*100).toFixed(1):0;
+    const pc=parseFloat(pct)>=56?'pct-hi':parseFloat(pct)>=50?'pct-mid':'pct-lo';
+    return `<tr><td style="color:var(--gold);font-family:'Bebas Neue',sans-serif">${y}</td>
+      <td>${d.wks}</td><td>${d.W+d.L+d.P}</td>
+      <td class="wc">${d.W}</td><td class="lc">${d.L}</td><td class="pc">${d.P}</td>
+      <td class="${pc}">${pct}%</td><td class="wc">${d.ouW}</td><td class="lc">${d.ouL}</td>
+      <td>${opct}%</td></tr>`;
+  });
+  tbody.innerHTML=rows.length?rows.join(''):'<tr><td colspan="10" style="color:var(--text3);text-align:center;padding:16px;font-family:\'DM Mono\',monospace">No backfill data yet.</td></tr>';
+}
+
+// =====================================================================
+// SITUATIONAL NOTES PAGE
+// =====================================================================
+function renderNotes() {
+  const notes = [
+    {cat:'🔴 HIGH VALUE RULES', items:[
+      {rule:'Home dog ≤4 pts with bye on deck', stat:'82% ATS', note:'Best single rule in your notes'},
+      {rule:'9-10 point spread dogs', stat:'82% ATS', note:'Consistently strong'},
+      {rule:'Double digit away favorites', stat:'84% ATS (16-3-1)', note:'Very small sample but high %'},
+      {rule:'Monday night team vs opponent off bye', stat:'73% ATS (24-9-1)', note:'Fade the rested team advantage'},
+      {rule:'Teams playing twice in 3 weeks — 1st game winner', stat:'LOSES 2nd 70%', note:'Fade the recent winner'},
+      {rule:'Home dog vs undefeated, ≥.500 record', stat:'80% ATS', note:'Undefeated teams get overvalued'},
+    ]},
+    {cat:'📅 WEEK-SPECIFIC RULES', items:[
+      {rule:'Week 1 divisional dogs', stat:'57% ATS', note:'Division games week 1'},
+      {rule:'Week 1 dogs, ≤6 wins prev year, up a TD', stat:'82-41 ATS', note:'Very specific but strong'},
+      {rule:'Week 3 — 0-2 team as dog', stat:'59% ATS'},
+      {rule:'Week 3 — 0-2 team as fav by 5+', stat:'69% ATS'},
+      {rule:'Week 3 — 0-2 team as fav by <5', stat:'29% ATS — FADE'},
+      {rule:'Week 3 — home team avg < 10 pts/game', stat:'74% ATS'},
+      {rule:'Week 16 dogs', stat:'56%+ ATS'},
+      {rule:'Week 17 road teams', stat:'58% ATS'},
+      {rule:'Week 17 favorite -3 or greater', stat:'7-19 ATS — FADE'},
+      {rule:'Week 17 double digit favorites', stat:'13-6-1 ATS 68%'},
+    ]},
+    {cat:'📆 BYE WEEK RULES (2015-2020 data)', items:[
+      {rule:'Road dog off bye', stat:'59% ATS', note:'Best bye situation'},
+      {rule:'Home dog off bye ≤4 pts', stat:'82% ATS', note:'Combined with home dog ≤4 rule'},
+      {rule:'Road favorite off bye', stat:'51% ATS', note:'Barely any edge'},
+      {rule:'Home favorite off bye', stat:'49% ATS', note:'No edge — slight negative'},
+      {rule:'Road dog off bye (general)', stat:'56% ATS'},
+    ]},
+    {cat:'📺 SCHEDULE/TRAVEL RULES', items:[
+      {rule:'Thursday road team 850+ miles', stat:'40% ATS', note:'Heavy fade'},
+      {rule:'Thursday road team <850 miles', stat:'48% ATS', note:'Still a fade'},
+      {rule:'Sunday home favorite with Thursday game next week', stat:'38% ATS — FADE', note:'Biggest schedule trap'},
+      {rule:'Sunday road team with Thursday ahead', stat:'69% ATS', note:'Flip side of above'},
+      {rule:'Away favorites of -3.5+ week 11 on', stat:'Favorable ATS'},
+      {rule:'Road team, opp allowed 400+ yds prior week', stat:'70% ATS'},
+    ]},
+    {cat:'🎯 SPREAD-BASED RULES', items:[
+      {rule:'Line between -6 and +6', stat:'89%+ — pick winner', note:'Big edge — winner usually covers'},
+      {rule:'Favorite 14+', stat:'70% ATS'},
+      {rule:'Line moves 3+ points', stat:'Go the other way', note:'Sharp money indicator'},
+      {rule:'Key numbers (margins): 3, 7, 6, 14, 10, 5, 8, 4, 1, 2, 17', stat:'Push risk near these', note:'6 & 4 becoming more valuable with modern NFL trends'},
+    ]},
+    {cat:'📊 STATS FOR PHASE 2 FORMULA', items:[
+      {rule:'Yards per play differential ÷ 2 → add/subtract to score estimate'},
+      {rule:'Net yards per play ÷ .15–.20 → spread estimate'},
+      {rule:'Time of possession differential → bonus points'},
+      {rule:'3rd down offense & defense %'},
+      {rule:'Last 3 games rolling stats (not full season average)'},
+      {rule:'Points scored/allowed on turnovers'},
+      {rule:'Special teams avg points per game'},
+      {rule:'Strength of schedule differential'},
+    ]},
+    {cat:'🏈 PLAYOFF NOTES', items:[
+      {rule:'Wildcard home dogs', stat:'15-7-3 (68% ATS)'},
+      {rule:'Use strength of schedule for wildcard games'},
+    ]},
+  ];
+
+  const el = document.getElementById('notes-content');
+  el.innerHTML = notes.map(section => `
+    <div style="margin-bottom:16px">
+      <div class="sec-title" style="margin-top:0">${section.cat}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:8px">
+        ${section.items.map(item=>`
+          <div style="background:var(--ink2);border:1px solid var(--line);border-radius:6px;padding:10px 12px">
+            <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text);margin-bottom:3px">${item.rule}</div>
+            ${item.stat?`<div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--gold);letter-spacing:1px">${item.stat}</div>`:''}
+            ${item.note?`<div style="font-size:10px;color:var(--text3);margin-top:3px;font-family:'DM Mono',monospace">${item.note}</div>`:''}
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+// =====================================================================
+// NAV
+// =====================================================================
+function showTab(name, el) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('tab-'+name).classList.add('on');
+  if(el) el.classList.add('on');
+  const {year,week} = curYear_wk();
+  curYear = year; curWeek = week;
+  if(name==='results') renderResultsForm();
+  if(name==='record') renderRecord();
+  if(name==='backfill') renderBfResults();
+}
+
+document.getElementById('yr').addEventListener('change', changeWeek);
+document.getElementById('wk').addEventListener('change', changeWeek);
+
+// =====================================================================
+// BOOT
+// =====================================================================
+load();
+checkLocalFileMode();
+</script>
+</body>
+</html>
