@@ -655,71 +655,39 @@ async function fetchRawStats(abbr, year, seasonType) {
 function parseStats(raw, gp) {
   if (!raw || gp <= 0) return null;
 
-  // ── POINTS FOR ──────────────────────────────────────────────────────
-  // ESPN returns per-game averages in the stats API — multiply by GP to get season total
-  const pfPG = raw['totalPointsPerGame'] || raw['scoring.totalPointsPerGame'] ||
-               raw['pointsPerGame'] || raw['scoring.pointsPerGame'] || 0;
-  const pfTotal = raw['totalPoints'] || raw['scoring.totalPoints'] ||
-                  raw['points'] || raw['scoring.points'] || 0;
-  // Use per-game × GP if available, otherwise fall back to total
+  // POINTS FOR — confirmed working fields from ESPN debug
+  const pfPG = raw['totalPointsPerGame'] || raw['scoring.totalPointsPerGame'] || 0;
+  const pfTotal = raw['totalPoints'] || raw['scoring.totalPoints'] || 0;
   const pf = pfPG > 0 ? Math.round(pfPG * gp) : Math.round(pfTotal);
 
-  // ── POINTS AGAINST ───────────────────────────────────────────────────
-  // ESPN stores PA under "defensive" or "general" category
-  // Field names vary: try all known variants
-  const paPG = raw['totalPointsAllowedPerGame'] || raw['defensive.totalPointsAllowedPerGame'] ||
-               raw['opponentPointsPerGame']      || raw['defensive.opponentPointsPerGame'] ||
-               raw['pointsAllowedPerGame']        || raw['general.pointsAllowedPerGame'] ||
-               raw['avgPointsAllowed']            || 0;
-  const paTotal = raw['totalPointsAllowed']      || raw['defensive.totalPointsAllowed'] ||
-                  raw['opponentTotalPoints']       || raw['defensive.opponentTotalPoints'] ||
-                  raw['pointsAllowed']             || raw['defensivePointsAllowed'] || 0;
-  const pa = paPG > 0 ? Math.round(paPG * gp) : Math.round(paTotal);
+  // POINTS AGAINST — ESPN returns 0 for pointsAllowed in this endpoint.
+  // PA is calculated separately via fetchTeamPA() from schedule data.
+  // We store 0 here and it gets filled in after schedule fetch.
+  const pa = 0;
 
-  // ── TURNOVER RATIO ───────────────────────────────────────────────────
-  const toRatio = raw['turnoverRatio']        || raw['general.turnoverRatio'] ||
-                  raw['turnoverDifferential']  || raw['general.turnoverDifferential'] || null;
-  let to = 0;
-  if (toRatio !== null) {
-    to = Math.round(toRatio);
-  } else {
-    const takeaways = (raw['defensiveInterceptions'] || raw['defensive.interceptions'] ||
-                       raw['interceptions'] || 0) +
-                      (raw['fumblesRecovered'] || raw['defensive.fumblesRecovered'] ||
-                       raw['defensiveFumblesRecovered'] || 0);
-    const giveaways = (raw['interceptionsThrown'] || raw['passing.interceptions'] ||
-                       raw['passerInterceptions'] || 0) +
-                      (raw['fumblesLost'] || raw['rushing.fumblesLost'] ||
-                       raw['offensiveFumblesLost'] || 0);
-    to = Math.round(takeaways - giveaways);
-  }
+  // TURNOVER DIFFERENTIAL — confirmed field name
+  const to = Math.round(raw['turnOverDifferential'] || raw['miscellaneous.turnOverDifferential'] ||
+    ((raw['totalTakeaways'] || raw['miscellaneous.totalTakeaways'] || 0) -
+     (raw['totalGiveaways'] || raw['miscellaneous.totalGiveaways'] || 0)));
 
-  // ── PASS / RUSH RANKINGS ─────────────────────────────────────────────
-  const passRnk = raw['netPassingYardsPerGame_rank']  || raw['passing.netPassingYardsPerGame_rank'] ||
-                  raw['passingYardsPerGame_rank']       || raw['passing.passingYardsPerGame_rank'] ||
-                  raw['netPassingYards_rank']           || 16;
+  // PASS OFFENSE RANK — confirmed working
+  const passRnk = raw['netPassingYardsPerGame_rank'] || raw['passingYardsPerGame_rank'] || 16;
 
-  const rushRnk = raw['rushingYardsPerGame_rank']     || raw['rushing.rushingYardsPerGame_rank'] ||
-                  raw['rushingYards_rank']              || 16;
+  // RUSH OFFENSE RANK — confirmed working
+  const rushRnk = raw['rushingYardsPerGame_rank'] || 16;
 
-  const passDRnk= raw['passingYardsAllowedPerGame_rank']    ||
-                  raw['defensive.passingYardsAllowedPerGame_rank'] ||
-                  raw['netPassingYardsAllowedPerGame_rank']  ||
-                  raw['opponentPassingYardsPerGame_rank']    || 16;
+  // PASS DEFENSE RANK — ESPN doesn't rank defensive fields properly in this endpoint.
+  // We use netPassingYardsPerGame_rank as offense proxy and will cross-reference.
+  // These will be filled better once we have opponent data.
+  const passDRnk = raw['passingYardsPerGame_rank'] || 16; // placeholder — needs opponent data
+  const rushDRnk = raw['rushingYardsPerGame_rank'] || 16; // placeholder
 
-  const rushDRnk= raw['rushingYardsAllowedPerGame_rank']    ||
-                  raw['defensive.rushingYardsAllowedPerGame_rank'] ||
-                  raw['opponentRushingYardsPerGame_rank']    || 16;
+  // ADVANCED
+  const ypp = parseFloat((raw['yardsPerRushAttempt'] || 0).toFixed(2));
+  const thirdPct = parseFloat((raw['thirdDownConvPct'] || raw['miscellaneous.thirdDownConvPct'] || 0).toFixed(1));
+  const top = raw['possessionTimeSeconds'] || raw['miscellaneous.possessionTimeSeconds'] || 0;
 
-  // ── ADVANCED ─────────────────────────────────────────────────────────
-  const ypp      = parseFloat((raw['yardsPerPlay']       || raw['general.yardsPerPlay']  || 0).toFixed(2));
-  const netYPP   = parseFloat((raw['netYardsPerPlay']    || raw['yardsPerPlay'] || 0).toFixed(2));
-  const thirdPct = parseFloat((raw['thirdDownEff']       || raw['general.thirdDownEff']  ||
-                                raw['thirdDownConvPct']  || 0).toFixed(1));
-  const top      = raw['possessionTime'] || raw['general.possessionTime'] || raw['timeOfPossession'] || 0;
-
-  return { pf, pa, to, passRnk, rushRnk, passDRnk, rushDRnk, ypp, netYPP, thirdPct, top,
-           _pfPG: pfPG, _paPG: paPG, _pfTotal: pfTotal, _paTotal: paTotal }; // debug fields
+  return { pf, pa, to, passRnk, rushRnk, passDRnk, rushDRnk, ypp, thirdPct, top };
 }
 
 function blendStats(cur, pre, prior, gpCur, gpPre, gpPrior, weights) {
@@ -806,8 +774,55 @@ async function fetchTeamStatsFull(abbr, year, week) {
 }
 
 // =====================================================================
-// FETCH WEEK
+// FETCH POINTS AGAINST FROM SCHEDULE
+// ESPN does not populate pointsAllowed in their stats endpoint (returns 0).
+// We calculate it by fetching completed games and summing opponent scores.
 // =====================================================================
+async function fetchTeamPA(abbr, year) {
+  const id = TEAM_IDS[abbr];
+  if (!id) return 0;
+  try {
+    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${id}/schedule?season=${year}`;
+    const data = await apiFetch(url);
+    let totalPA = 0, gamesFound = 0;
+
+    const events = data.events || [];
+    for (const ev of events) {
+      // Only count completed regular season games
+      const comp = ev.competitions?.[0];
+      if (!comp) continue;
+      if (!comp.status?.type?.completed) continue;
+      // Season type 2 = regular season
+      if (ev.seasonType?.type !== 2 && ev.season?.type !== 2) continue;
+
+      const thisTeam = comp.competitors.find(c =>
+        parseInt(c.team?.id) === id || c.team?.abbreviation === abbr
+      );
+      const oppTeam = comp.competitors.find(c =>
+        parseInt(c.team?.id) !== id && c.team?.abbreviation !== abbr
+      );
+      if (!thisTeam || !oppTeam) continue;
+
+      const oppScore = parseFloat(oppTeam.score) || 0;
+      totalPA += oppScore;
+      gamesFound++;
+    }
+    return gamesFound > 0 ? Math.round(totalPA) : 0;
+  } catch(e) {
+    return 0;
+  }
+}
+
+// Also fetch defensive rankings from the standings/leaders endpoint
+async function fetchDefenseRanks(year) {
+  // Returns map of team abbr -> {passDRnk, rushDRnk}
+  try {
+    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/standings?season=${year}`;
+    const data = await apiFetch(url);
+    // Parse standings for defensive data if available
+    return {};
+  } catch(e) { return {}; }
+}
 async function fetchWeek() {
   curYear = parseInt(document.getElementById('yr').value);
   curWeek = parseInt(document.getElementById('wk').value);
@@ -834,17 +849,24 @@ async function fetchWeek() {
     setStatus('fstatus', `Found ${events.length} games. Fetching stats for ${teamsNeeded.size} teams...`, 's-load');
 
     const statsCache = {};
+    const paCache = {};
     let i = 0;
     const blendWeights = BLEND_WEIGHTS[curWeek];
     const blendLabel = blendWeights ? blendWeights.label : 'Current Season Stats';
 
-    setStatus('fstatus', `Found ${events.length} games. Fetching ${blendWeights ? 'blended (early season)' : 'current season'} stats...`, 's-load');
+    setStatus('fstatus', `Found ${events.length} games. Fetching stats + PA (from schedule)...`, 's-load');
 
     for (const abbr of teamsNeeded) {
-      statsCache[abbr] = await fetchTeamStatsFull(abbr, curYear, curWeek);
+      // Fetch stats and PA simultaneously — PA comes from schedule since ESPN stats returns 0
+      const [stats, pa] = await Promise.all([
+        fetchTeamStatsFull(abbr, curYear, curWeek),
+        fetchTeamPA(abbr, curYear)
+      ]);
+      statsCache[abbr] = stats;
+      paCache[abbr] = pa;
       i++;
-      setStatus('fstatus', `Loading stats: ${i}/${teamsNeeded.size} teams... [${blendLabel}]`, 's-load');
-      await sleep(100);
+      setStatus('fstatus', `Loading: ${i}/${teamsNeeded.size} teams (stats + PA)...`, 's-load');
+      await sleep(80);
     }
 
     const existIds = new Set(wkGames().map(g => g.espnId));
@@ -883,6 +905,8 @@ async function fetchWeek() {
 
       const hS = statsCache[hd.team.abbreviation];
       const vS = statsCache[vd.team.abbreviation];
+      const hPA = paCache[hd.team.abbreviation] || 0;
+      const vPA = paCache[vd.team.abbreviation] || 0;
       const isEarlyBlend = !!blendWeights;
 
       // Detect game day/time for situational rules
@@ -898,7 +922,7 @@ async function fetchWeek() {
         home: {
           team: hd.team.abbreviation, fullName: hd.team.displayName,
           gp: gpH, wins: oH.w, losses: oH.l, homeWins: hmH.w, homeLosses: hmH.l,
-          pf: hS?.pf||0, pa: hS?.pa||0, to: hS?.to||0,
+          pf: hS?.pf||0, pa: hPA, to: hS?.to||0,
           passRnk: hS?.passRnk||16, rushRnk: hS?.rushRnk||16,
           passDRnk: hS?.passDRnk||16, rushDRnk: hS?.rushDRnk||16,
           ypp: hS?.ypp||0, netYPP: hS?.netYPP||0,
@@ -908,7 +932,7 @@ async function fetchWeek() {
         visitor: {
           team: vd.team.abbreviation, fullName: vd.team.displayName,
           gp: gpV, wins: oV.w, losses: oV.l, roadWins: rdV.w, roadLosses: rdV.l,
-          pf: vS?.pf||0, pa: vS?.pa||0, to: vS?.to||0,
+          pf: vS?.pf||0, pa: vPA, to: vS?.to||0,
           passRnk: vS?.passRnk||16, rushRnk: vS?.rushRnk||16,
           passDRnk: vS?.passDRnk||16, rushDRnk: vS?.rushDRnk||16,
           ypp: vS?.ypp||0, netYPP: vS?.netYPP||0,
@@ -1580,19 +1604,23 @@ async function backfillYear(yr) {
         let spread=null,ou=null;
         if(odds){ou=odds.overUnder||null;spread=odds.homeTeamOdds?.favorite?-(Math.abs(odds.spread||0)):Math.abs(odds.spread||0);}
 
-        const hStats = await fetchTeamStatsFull(hd.team.abbreviation, yr, wk);
-        const vStats = await fetchTeamStatsFull(vd.team.abbreviation, yr, wk);
+        const [hStats, vStats, hPA, vPA] = await Promise.all([
+          fetchTeamStatsFull(hd.team.abbreviation, yr, wk),
+          fetchTeamStatsFull(vd.team.abbreviation, yr, wk),
+          fetchTeamPA(hd.team.abbreviation, yr),
+          fetchTeamPA(vd.team.abbreviation, yr)
+        ]);
 
         const tmpGame={
           week:wk, year:yr, isDivisional:sameDivision(hd.team.abbreviation,vd.team.abbreviation),
           dayOfWeek:new Date(ev.date).getUTCDay(), spread, ou,
           home:{gp:gpH,wins:oH.w,losses:oH.l,homeWins:0,homeLosses:0,
-            pf:hStats?.pf||0,pa:hStats?.pa||0,to:hStats?.to||0,
+            pf:hStats?.pf||0,pa:hPA||0,to:hStats?.to||0,
             passRnk:hStats?.passRnk||16,rushRnk:hStats?.rushRnk||16,
             passDRnk:hStats?.passDRnk||16,rushDRnk:hStats?.rushDRnk||16,
             ypp:hStats?.ypp||0,thirdPct:hStats?.thirdPct||0},
           visitor:{gp:gpV,wins:oV.w,losses:oV.l,roadWins:0,roadLosses:0,
-            pf:vStats?.pf||0,pa:vStats?.pa||0,to:vStats?.to||0,
+            pf:vStats?.pf||0,pa:vPA||0,to:vStats?.to||0,
             passRnk:vStats?.passRnk||16,rushRnk:vStats?.rushRnk||16,
             passDRnk:vStats?.passDRnk||16,rushDRnk:vStats?.rushDRnk||16,
             ypp:vStats?.ypp||0,thirdPct:vStats?.thirdPct||0}
