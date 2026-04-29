@@ -775,8 +775,9 @@ async function fetchTeamStatsFull(abbr, year, week) {
 
 // =====================================================================
 // FETCH POINTS AGAINST FROM SCHEDULE
-// ESPN does not populate pointsAllowed in their stats endpoint (returns 0).
-// We calculate it by fetching completed games and summing opponent scores.
+// ESPN stats endpoint returns pointsAllowed: 0 — it's broken on their end.
+// We calculate PA by fetching the team schedule and summing opponent scores.
+// Confirmed working endpoint: site.api.espn.com/teams/{id}/schedule
 // =====================================================================
 async function fetchTeamPA(abbr, year) {
   const id = TEAM_IDS[abbr];
@@ -788,27 +789,37 @@ async function fetchTeamPA(abbr, year) {
 
     const events = data.events || [];
     for (const ev of events) {
-      // Only count completed regular season games
       const comp = ev.competitions?.[0];
       if (!comp) continue;
+      // Only completed games
       if (!comp.status?.type?.completed) continue;
-      // Season type 2 = regular season
-      if (ev.seasonType?.type !== 2 && ev.season?.type !== 2) continue;
+      // Only regular season (seasonType.type = 2)
+      const sType = ev.seasonType?.type || ev.seasonType?.id || 0;
+      if (sType !== 2) continue;
 
-      const thisTeam = comp.competitors.find(c =>
-        parseInt(c.team?.id) === id || c.team?.abbreviation === abbr
+      // Find this team and opponent
+      const myTeam = comp.competitors?.find(c =>
+        String(c.team?.id) === String(id) || c.team?.abbreviation === abbr
       );
-      const oppTeam = comp.competitors.find(c =>
-        parseInt(c.team?.id) !== id && c.team?.abbreviation !== abbr
+      const oppTeam = comp.competitors?.find(c =>
+        String(c.team?.id) !== String(id) && c.team?.abbreviation !== abbr
       );
-      if (!thisTeam || !oppTeam) continue;
+      if (!myTeam || !oppTeam) continue;
 
-      const oppScore = parseFloat(oppTeam.score) || 0;
-      totalPA += oppScore;
-      gamesFound++;
+      const oppScore = parseFloat(oppTeam.score);
+      if (!isNaN(oppScore) && oppScore >= 0) {
+        totalPA += oppScore;
+        gamesFound++;
+      }
     }
+
+    if (abbr === 'ARI') {
+      console.log(`[PA Debug] ${abbr} ${year}: found ${gamesFound} completed regular season games, totalPA=${totalPA}`);
+    }
+
     return gamesFound > 0 ? Math.round(totalPA) : 0;
   } catch(e) {
+    console.warn(`[PA Debug] fetchTeamPA failed for ${abbr}:`, e.message);
     return 0;
   }
 }
