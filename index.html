@@ -583,20 +583,28 @@ const BLEND_WEIGHTS = {
 };
 
 async function fetchRawStats(abbr, year, seasonType) {
-  // seasonType: 1=preseason, 2=regular season
   const id = TEAM_IDS[abbr];
   if (!id) return null;
+
+  // PRIMARY: site.api.espn.com/teams/statistics — confirmed working endpoint
+  // Returns categories with stat arrays including name, value, rank
   try {
-    const url = `${ESPN_CORE}/seasons/${year}/types/${seasonType}/teams/${id}/statistics`;
+    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${id}/statistics`;
     const data = await apiFetch(url);
     const s = {};
-    if (data.splits && data.splits.categories) {
+
+    if (data.results && data.results.stats) {
+      // Flat stats format
+      for (const stat of data.results.stats) {
+        s[stat.name] = parseFloat(stat.value) || 0;
+        if (stat.rank !== undefined) s[stat.name + '_rank'] = parseInt(stat.rank) || 16;
+      }
+    } else if (data.splits && data.splits.categories) {
+      // Categorized format — flatten all, also store with category prefix
       for (const cat of data.splits.categories) {
-        const catName = (cat.name || '').toLowerCase();
+        const catName = (cat.name || '').toLowerCase().replace(/\s+/g,'');
         for (const stat of (cat.stats || [])) {
-          // Store by stat name
           s[stat.name] = parseFloat(stat.value) || 0;
-          // Store by "category.statName" for disambiguation
           s[catName + '.' + stat.name] = parseFloat(stat.value) || 0;
           if (stat.rank !== undefined) {
             s[stat.name + '_rank'] = parseInt(stat.rank) || 16;
@@ -604,25 +612,44 @@ async function fetchRawStats(abbr, year, seasonType) {
           }
         }
       }
-    }
-    // Also try the team summary endpoint for simpler points data
-    if (!s['totalPoints'] && !s['totalPointsPerGame']) {
-      try {
-        const sumUrl = `${ESPN_CORE}/seasons/${year}/types/${seasonType}/teams/${id}`;
-        const sumData = await apiFetch(sumUrl);
-        if (sumData.record?.items) {
-          for (const item of sumData.record.items) {
-            if (item.stats) {
-              for (const st of item.stats) {
-                if (!s[st.name]) s['record.' + st.name] = parseFloat(st.value) || 0;
-              }
-            }
+    } else if (data.categories) {
+      // Another ESPN format variant
+      for (const cat of data.categories) {
+        const catName = (cat.name || '').toLowerCase().replace(/\s+/g,'');
+        for (const stat of (cat.stats || cat.statistics || [])) {
+          s[stat.name] = parseFloat(stat.value) || 0;
+          s[catName + '.' + stat.name] = parseFloat(stat.value) || 0;
+          if (stat.rank !== undefined) {
+            s[stat.name + '_rank'] = parseInt(stat.rank) || 16;
           }
         }
-      } catch(e) {}
+      }
     }
-    return Object.keys(s).length > 0 ? s : null;
-  } catch(e) { return null; }
+
+    if (Object.keys(s).length > 5) return s;
+  } catch(e) {}
+
+  // FALLBACK: core API (may return 0s but worth trying)
+  try {
+    const url2 = `${ESPN_CORE}/seasons/${year}/types/${seasonType}/teams/${id}/statistics`;
+    const data2 = await apiFetch(url2);
+    const s2 = {};
+    if (data2.splits && data2.splits.categories) {
+      for (const cat of data2.splits.categories) {
+        const catName = (cat.name||'').toLowerCase().replace(/\s+/g,'');
+        for (const stat of (cat.stats||[])) {
+          s2[stat.name] = parseFloat(stat.value) || 0;
+          s2[catName+'.'+stat.name] = parseFloat(stat.value) || 0;
+          if (stat.rank !== undefined) {
+            s2[stat.name+'_rank'] = parseInt(stat.rank)||16;
+          }
+        }
+      }
+    }
+    if (Object.keys(s2).length > 5) return s2;
+  } catch(e) {}
+
+  return null;
 }
 
 function parseStats(raw, gp) {
@@ -755,11 +782,16 @@ async function fetchTeamStatsFull(abbr, year, week) {
 
   if (!weights) {
     const cur = await fetchRawStats(abbr, year, 2);
-    if (cur && abbr === [...Object.keys(TEAM_IDS)][0]) {
-      // Log first team's raw fields once so we can debug PA
-      const paFields = Object.keys(cur).filter(k => k.toLowerCase().includes('point') || k.toLowerCase().includes('allow') || k.toLowerCase().includes('score'));
-      console.log(`[ESPN Debug] ${abbr} ${year} stat fields related to points:`, paFields.slice(0, 20));
-      console.log(`[ESPN Debug] Sample values:`, paFields.slice(0,10).reduce((o,k)=>{o[k]=cur[k];return o;},{}));
+    // Debug: log ALL fields for first team so we can see exact structure
+    if (cur && Object.keys(TEAM_IDS).indexOf(abbr) === 0) {
+      console.log(`[ESPN Debug] ${abbr} ${year} ALL fields (${Object.keys(cur).length} total):`);
+      console.log('[ESPN Debug] Full object:', cur);
+      const ptFields = Object.keys(cur).filter(k =>
+        k.toLowerCase().includes('point') || k.toLowerCase().includes('score') ||
+        k.toLowerCase().includes('allow') || k.toLowerCase().includes('oppon')
+      );
+      console.log('[ESPN Debug] Points-related fields:', ptFields);
+      ptFields.forEach(f => console.log(`  ${f}: ${cur[f]}`));
     }
     return cur ? parseStats(cur, gpCur) : null;
   }
