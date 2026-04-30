@@ -287,9 +287,9 @@ button:disabled{opacity:.4;cursor:not-allowed}
   </div>
 
   <div class="info">
-    <strong>Auto-fetched (ESPN):</strong> Matchups · Records · PF · PA · Turnovers · Pass/Rush Off &amp; Def Ranks · Yards/Play · 3rd Down % · Time of Possession<br>
+    <strong>Auto-fetched:</strong> Matchups · Records · PF · PA · Turnovers · Pass/Rush Off &amp; Def Ranks · Yards/Play · 3rd Down % · Time of Possession<br>
     <strong>You enter:</strong> Spread and/or Total (one or both — calculation works either way)<br>
-    <strong>Ranking:</strong> 16 = most confident (largest gap from Vegas line) · 1 = least confident · Yahoo Pick'em compatible
+    <strong>Ranking:</strong> 16 = most confident (largest gap from Vegas line) · 1 = least confident
   </div>
 
   <div id="games-wrap" class="games-wrap"></div>
@@ -376,7 +376,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
   <div class="scroll">
   <table class="dtable">
     <thead><tr><th>Season</th><th>Weeks</th><th>Games</th><th>Wins</th><th>Losses</th><th>Pushes</th>
-      <th>Win%</th><th>O/U W</th><th>O/U L</th><th>O/U%</th></tr></thead>
+      <th>Win%</th><th>Note</th><th>O/U W</th><th>O/U L</th><th>O/U%</th></tr></thead>
     <tbody id="bf-results"></tbody>
   </table>
   </div>
@@ -1606,22 +1606,33 @@ async function backfillYear(yr) {
         };
 
         const c = calcGame(tmpGame);
-        if (!c||c.spreadDiff===null) continue;
+        if (!c) continue;
 
-        const actualSpread=hs-vs;
-        let pr2='N/A';
-        if(spread!==null){
-          const diff=actualSpread-spread;
-          if(Math.abs(diff)<0.1)pr2='PUSH';
-          else if((c.pickSide==='HOME'&&actualSpread>spread)||(c.pickSide==='VISITOR'&&actualSpread<spread))pr2='COVER';
-          else pr2='LOSE';
+        const actualSpread = hs - vs; // positive = home won
+        let pr2 = 'N/A';
+
+        if (spread !== null) {
+          // We have a Vegas line — evaluate ATS (against the spread)
+          const diff = actualSpread - spread;
+          if (Math.abs(diff) < 0.1) pr2 = 'PUSH';
+          else if ((c.pickSide==='HOME'&&actualSpread>spread)||(c.pickSide==='VISITOR'&&actualSpread<spread)) pr2 = 'COVER';
+          else pr2 = 'LOSE';
+        } else {
+          // No Vegas line — evaluate straight up (did we pick the right winner?)
+          if (Math.abs(actualSpread) < 1) pr2 = 'PUSH'; // tie
+          else if ((c.pickSide==='HOME'&&actualSpread>0)||(c.pickSide==='VISITOR'&&actualSpread<0)) pr2 = 'COVER';
+          else pr2 = 'LOSE';
         }
-        let ouR=null;
-        if(ou!==null){const tot=hs+vs;ouR=Math.abs(tot-ou)<0.1?'PUSH':tot>ou?'WIN':'LOSE';}
+
+        let ouR = null;
+        if (ou !== null) {
+          const tot = hs + vs;
+          ouR = Math.abs(tot-ou) < 0.1 ? 'PUSH' : tot > ou ? 'WIN' : 'LOSE';
+        }
 
         if(pr2==='COVER')W++;else if(pr2==='LOSE')L++;else if(pr2==='PUSH')P++;
         if(ouR==='WIN')ouW++;else if(ouR==='LOSE')ouL++;else if(ouR==='PUSH')ouP++;
-        wkGamesData[ev.id]={hScore:hs,vScore:vs,pickResult:pr2,ouResult:ouR,rank:null,isDog:c.isDog};
+        if(pr2!=='N/A') wkGamesData[ev.id]={hScore:hs,vScore:vs,pickResult:pr2,ouResult:ouR,rank:null,isDog:c.isDog,hadSpread:spread!==null};
       }
 
       if(Object.keys(wkGamesData).length){
@@ -1648,11 +1659,15 @@ function renderBfResults() {
   Object.entries(history).forEach(([wk,wd])=>{
     if(!wd.meta?.year||wd.meta?.source!=='backfill') return;
     const y=wd.meta.year;
-    if(!byYear[y]) byYear[y]={wks:0,W:0,L:0,P:0,ouW:0,ouL:0};
+    if(!byYear[y]) byYear[y]={wks:0,W:0,L:0,P:0,ouW:0,ouL:0,ats:0,su:0};
     byYear[y].wks++;
     Object.values(wd.games||{}).forEach(r=>{
-      if(r.pickResult==='COVER')byYear[y].W++;else if(r.pickResult==='LOSE')byYear[y].L++;else byYear[y].P++;
-      if(r.ouResult==='WIN')byYear[y].ouW++;else if(r.ouResult==='LOSE')byYear[y].ouL++;
+      if(r.pickResult==='COVER')byYear[y].W++;
+      else if(r.pickResult==='LOSE')byYear[y].L++;
+      else if(r.pickResult==='PUSH')byYear[y].P++;
+      if(r.ouResult==='WIN')byYear[y].ouW++;
+      else if(r.ouResult==='LOSE')byYear[y].ouL++;
+      if(r.hadSpread)byYear[y].ats++;else byYear[y].su++;
     });
   });
   const tbody=document.getElementById('bf-results');
@@ -1661,13 +1676,16 @@ function renderBfResults() {
     const eff=d.W+d.L, pct=eff>0?((d.W/eff)*100).toFixed(1):0;
     const oeff=d.ouW+d.ouL, opct=oeff>0?((d.ouW/oeff)*100).toFixed(1):0;
     const pc=parseFloat(pct)>=56?'pct-hi':parseFloat(pct)>=50?'pct-mid':'pct-lo';
+    const note=d.ats>0&&d.su>0?`${d.ats} ATS / ${d.su} SU`:d.ats>0?'ATS':'SU (no line)';
     return `<tr><td style="color:var(--gold);font-family:'Bebas Neue',sans-serif">${y}</td>
       <td>${d.wks}</td><td>${d.W+d.L+d.P}</td>
       <td class="wc">${d.W}</td><td class="lc">${d.L}</td><td class="pc">${d.P}</td>
-      <td class="${pc}">${pct}%</td><td class="wc">${d.ouW}</td><td class="lc">${d.ouL}</td>
+      <td class="${pc}">${pct}%</td>
+      <td style="font-size:10px;color:var(--text3)">${note}</td>
+      <td class="wc">${d.ouW}</td><td class="lc">${d.ouL}</td>
       <td>${opct}%</td></tr>`;
   });
-  tbody.innerHTML=rows.length?rows.join(''):'<tr><td colspan="10" style="color:var(--text3);text-align:center;padding:16px;font-family:\'DM Mono\',monospace">No backfill data yet.</td></tr>';
+  tbody.innerHTML=rows.length?rows.join(''):'<tr><td colspan="11" style="color:var(--text3);text-align:center;padding:16px;font-family:\'DM Mono\',monospace">No backfill data yet.</td></tr>';
 }
 
 // =====================================================================
