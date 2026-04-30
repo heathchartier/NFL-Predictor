@@ -786,60 +786,63 @@ async function fetchTeamPA(abbr, year) {
     const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${id}/schedule?season=${year}`;
     const data = await apiFetch(url);
     let totalPA = 0, gamesFound = 0;
-
     const events = data.events || [];
-
-    // Debug first event to see exact structure
-    if (abbr === 'ARI' && events.length > 0) {
-      const ev0 = events[0];
-      const comp0 = ev0.competitions?.[0];
-      console.log('[PA Debug] First event keys:', Object.keys(ev0));
-      console.log('[PA Debug] seasonType:', ev0.seasonType);
-      console.log('[PA Debug] season:', ev0.season);
-      console.log('[PA Debug] status:', comp0?.status?.type);
-      console.log('[PA Debug] competitors scores:', comp0?.competitors?.map(c => ({team: c.team?.abbreviation, score: c.score, id: c.team?.id})));
-      console.log('[PA Debug] total events:', events.length);
-    }
 
     for (const ev of events) {
       const comp = ev.competitions?.[0];
       if (!comp) continue;
 
-      // Check completion — try multiple paths ESPN uses
-      const completed = comp.status?.type?.completed ||
-                        comp.status?.type?.name === 'STATUS_FINAL' ||
-                        comp.status?.type?.state === 'post';
+      // Check completion
+      const status = comp.status?.type || comp.status || {};
+      const completed = status.completed === true ||
+                        status.name === 'STATUS_FINAL' ||
+                        status.state === 'post';
       if (!completed) continue;
 
-      // Season type check — ESPN uses different structures
-      // Try every known path, default to including if we can't determine
-      const stType = ev.seasonType?.type ||
-                     ev.seasonType?.id ||
-                     ev.season?.type ||
-                     ev.season?.seasonType ||
-                     2; // default assume regular season if unknown
-      // 1=preseason, 2=regular, 3=postseason
-      if (stType === 1 || stType === 3) continue;
+      // Season type — id comes as string '2', type as number 2
+      const stType = parseInt(ev.seasonType?.type || ev.seasonType?.id || 2);
+      if (stType === 1 || stType === 3) continue; // skip pre/postseason
 
-      const oppTeam = comp.competitors?.find(c =>
-        String(c.team?.id) !== String(id) && c.team?.abbreviation !== abbr
-      );
-      if (!oppTeam) continue;
+      // Get competitors — in schedule endpoint they may not have team.id
+      // Just take both scores: our score vs opponent score
+      const competitors = comp.competitors || [];
+      if (competitors.length < 2) continue;
 
-      const oppScore = parseFloat(oppTeam.score);
-      if (!isNaN(oppScore) && oppScore >= 0) {
-        totalPA += oppScore;
-        gamesFound++;
+      // Find which competitor is "home team this" — use homeAway or abbreviation
+      let myScore = null, oppScore = null;
+      for (const c of competitors) {
+        const cAbbr = c.team?.abbreviation || c.team?.abbrev || '';
+        const cId = String(c.team?.id || c.id || '');
+        const isMe = cAbbr === abbr || cId === String(id);
+        const score = parseFloat(c.score);
+        if (isNaN(score)) continue;
+        if (isMe) myScore = score;
+        else oppScore = score;
       }
+
+      // If we couldn't identify by abbr/id, use homeAway field
+      if (oppScore === null) {
+        // Can't identify teams — try using scores array directly
+        // Just skip rather than guess wrong
+        continue;
+      }
+
+      totalPA += oppScore;
+      gamesFound++;
     }
 
     if (abbr === 'ARI') {
-      console.log(`[PA Debug] ${abbr} ${year}: found ${gamesFound} completed games, totalPA=${totalPA}`);
+      console.log(`[PA Debug] ${abbr} ${year}: found ${gamesFound} games, totalPA=${totalPA}`);
+      // Log first competitor to see structure
+      const ev0 = events.find(e => e.competitions?.[0]?.status?.type?.completed);
+      if (ev0) {
+        console.log('[PA Debug] Sample competitor:', JSON.stringify(ev0.competitions[0].competitors[0]).slice(0, 300));
+      }
     }
 
     return gamesFound > 0 ? Math.round(totalPA) : 0;
   } catch(e) {
-    console.warn(`[PA Debug] fetchTeamPA failed for ${abbr}:`, e.message);
+    console.warn(`[PA Debug] Error:`, e.message);
     return 0;
   }
 }
