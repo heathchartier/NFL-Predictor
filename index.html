@@ -299,7 +299,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
     <div class="scroll">
     <table class="dtable">
       <thead><tr>
-        <th>Rank</th><th>Matchup</th><th>Pick</th><th>Dog?</th>
+        <th>Rank</th><th>Matchup</th><th>Pick</th>
         <th>Est. Score</th><th>Spread Diff</th><th>O/U Pick</th>
         <th>Est. Total</th><th>Alerts</th>
       </tr></thead>
@@ -996,13 +996,18 @@ function calcGame(g) {
   if (hPA > vPF) vBase = vPF + hPA / vPF;
   else vBase = (vPF - vPF / hPA) / 2;
 
+  // Home field advantage: 1.5 pts
+  // Data shows 3.0 was too high — reduced based on 15yr backfill analysis
+  // HFA has declined since 2019 (COVID, analytics, less crowd impact)
+  const HFA = 1.5;
+
   // Ranking adjustments
   const hPassAdj = rankPts(h.passRnk, v.passDRnk);
   const hRushAdj = rankPts(h.rushRnk, v.rushDRnk);
   const vPassAdj = rankPts(v.passRnk, h.passDRnk);
   const vRushAdj = rankPts(v.rushRnk, h.rushDRnk);
 
-  let hScore = hBase + hPassAdj + hRushAdj;
+  let hScore = hBase + HFA + hPassAdj + hRushAdj;
   let vScore = vBase + vPassAdj + vRushAdj;
   hScore = Math.max(0, hScore);
   vScore = Math.max(0, vScore);
@@ -1024,6 +1029,13 @@ function calcGame(g) {
   const pickTeam = estSpread >= 0 ? h.team : v.team;
   const pickFull = estSpread >= 0 ? h.fullName : v.fullName;
 
+  // Spread filter — data shows <3.5 spread = near coin flip (49.6% ATS)
+  // Flag games below threshold so user knows to treat with caution
+  const SPREAD_THRESHOLD = 3.5;
+  const sp_val = g.spread !== null && g.spread !== '' ? Math.abs(parseFloat(g.spread)) : null;
+  const belowThreshold = sp_val !== null && sp_val < SPREAD_THRESHOLD;
+  const noSpread = sp_val === null;
+
   // Is pick the underdog?
   let isDog = false;
   if (g.spread !== null && g.spread !== '') {
@@ -1038,7 +1050,8 @@ function calcGame(g) {
   const alerts = getSituationalAlerts(g, pickSide, spreadDiff);
 
   return { hScore, vScore, estSpread, estTotal, spreadDiff, ouDiff,
-           pickSide, pickTeam, pickFull, ouPick, isDog, alerts };
+           pickSide, pickTeam, pickFull, ouPick, isDog, alerts,
+           belowThreshold, noSpread };
 }
 
 // =====================================================================
@@ -1244,6 +1257,8 @@ function gameCard(g) {
         ${c ? `<span class="badge ${c.pickSide==='HOME'?'b-home':'b-vis'}">${c.pickFull||c.pickTeam}</span>` : ''}
         ${c?.isDog ? '<span class="badge b-dog">🐕 DOG</span>' : ''}
         ${c?.ouPick ? `<span class="badge ${c.ouPick==='OVER'?'b-over':'b-under'}">${c.ouPick}</span>` : ''}
+        ${c?.belowThreshold ? '<span class="badge" style="background:#1a1a00;color:#aaaa00;border:1px solid #444400" title="Spread under 3.5 — historically near coin flip (49.6% ATS). Low confidence.">⚠ TIGHT LINE</span>' : ''}
+        ${c?.noSpread ? '<span class="badge" style="background:#1a1a1a;color:#666" title="No spread entered — enter spread for full analysis">NO LINE</span>' : ''}
       </div>
       <button onclick="removeGame(${g.id})" class="btn-red btn-sm" style="margin-left:6px">✕</button>
     </div>
@@ -1332,8 +1347,10 @@ function renderRanked() {
     return `<tr>
       <td><span class="rnum ${rnClass}">${r}</span></td>
       <td style="font-weight:700;font-family:'DM Mono',monospace">${g.home.team} vs ${g.visitor.team}</td>
-      <td><span class="badge ${c.pickSide==='HOME'?'b-home':'b-vis'}">${c.pickTeam}</span></td>
-      <td>${c.isDog?'<span class="badge b-dog">🐕 DOG</span>':''}</td>
+      <td><span class="badge ${c.pickSide==='HOME'?'b-home':'b-vis'}">${c.pickTeam}</span>
+        ${c.isDog?'<span class="badge b-dog" style="margin-left:4px">🐕</span>':''}
+        ${c.belowThreshold?'<span style="font-size:10px;color:#aaaa00;margin-left:4px">⚠ tight</span>':''}
+      </td>
       <td style="font-family:'DM Mono',monospace">${(c.hScore||0).toFixed(1)} — ${(c.vScore||0).toFixed(1)}</td>
       <td><span class="${dcClass}">${c.spreadDiff!=null?(c.spreadDiff||0).toFixed(2):'—'}</span></td>
       <td>${c.ouPick?`<span class="badge ${c.ouPick==='OVER'?'b-over':'b-under'}">${c.ouPick}</span>`:'—'}</td>
@@ -1832,7 +1849,17 @@ function renderNotes() {
       {rule:'Line moves 3+ points', stat:'Go the other way', note:'Sharp money indicator'},
       {rule:'Key numbers (margins): 3, 7, 6, 14, 10, 5, 8, 4, 1, 2, 17', stat:'Push risk near these', note:'6 & 4 becoming more valuable with modern NFL trends'},
     ]},
-    {cat:'📊 STATS FOR PHASE 2 FORMULA', items:[
+    {cat:'📊 DATA-PROVEN FORMULA FINDINGS (15yr backtest)', items:[
+      {rule:'Spread ≥ 3.5 filter', stat:'63.4% ATS (2,185 games)', note:'Below 3.5 = 49.6% — near coin flip. Games under 3.5 flagged ⚠ TIGHT LINE'},
+      {rule:'Spread ≥ 5.0 for real money bets', stat:'65.1% ATS (1,572 games)', note:'Best bet threshold for actual wagering'},
+      {rule:'Spread ≥ 6.0 highest confidence', stat:'65.8% ATS (1,358 games)', note:'Fewer games but strongest edge'},
+      {rule:'Home field advantage', stat:'1.5 pts optimal', note:'Was 3.0 — reduced based on data. HFA has declined post-2019'},
+      {rule:'Odd years outperform even years', stat:'57.7% vs 53.9%', note:'Structural pattern over 15 years — under investigation'},
+      {rule:'Weeks 13-15 strongest', stat:'59.1% ATS', note:'Late season but before week 16-18 motivation issues'},
+      {rule:'Weeks 16-18 weakest', stat:'54.8% ATS', note:'Teams resting starters, eliminated teams, motivation factors'},
+      {rule:'Est. margin 15+ pts', stat:'76.4% ATS', note:'When model strongly disagrees with Vegas — trust the ranking'},
+      {rule:'Est. margin 6-10 pts', stat:'49.6% ATS — DEAD ZONE', note:'Model least reliable in this range'},
+    ]},
       {rule:'Yards per play differential ÷ 2 → add/subtract to score estimate'},
       {rule:'Net yards per play ÷ .15–.20 → spread estimate'},
       {rule:'Time of possession differential → bonus points'},
