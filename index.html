@@ -788,58 +788,56 @@ async function fetchTeamPA(abbr, year) {
     let totalPA = 0, gamesFound = 0;
     const events = data.events || [];
 
+    // Debug: log full structure of first completed game
+    if (abbr === 'ARI') {
+      const ev0 = events.find(e => {
+        const st = e.competitions?.[0]?.status?.type;
+        return st?.completed || st?.state === 'post';
+      });
+      if (ev0) {
+        const comp0 = ev0.competitions[0];
+        console.log('[PA Debug] Full first completed event:', JSON.stringify(ev0).slice(0, 800));
+        console.log('[PA Debug] comp keys:', Object.keys(comp0));
+        console.log('[PA Debug] Full competitors:', JSON.stringify(comp0.competitors));
+      }
+    }
+
     for (const ev of events) {
       const comp = ev.competitions?.[0];
       if (!comp) continue;
 
-      // Check completion
-      const status = comp.status?.type || comp.status || {};
-      const completed = status.completed === true ||
-                        status.name === 'STATUS_FINAL' ||
-                        status.state === 'post';
+      const status = comp.status?.type || {};
+      const completed = status.completed === true || status.state === 'post' || status.name === 'STATUS_FINAL';
       if (!completed) continue;
 
-      // Season type — id comes as string '2', type as number 2
       const stType = parseInt(ev.seasonType?.type || ev.seasonType?.id || 2);
-      if (stType === 1 || stType === 3) continue; // skip pre/postseason
+      if (stType === 1 || stType === 3) continue;
 
-      // Get competitors — in schedule endpoint they may not have team.id
-      // Just take both scores: our score vs opponent score
       const competitors = comp.competitors || [];
       if (competitors.length < 2) continue;
 
-      // Find which competitor is "home team this" — use homeAway or abbreviation
-      let myScore = null, oppScore = null;
+      // Find opponent — the competitor whose team abbreviation != abbr and id != our id
+      let oppScore = null;
       for (const c of competitors) {
-        const cAbbr = c.team?.abbreviation || c.team?.abbrev || '';
+        const cAbbr = c.team?.abbreviation || '';
         const cId = String(c.team?.id || c.id || '');
         const isMe = cAbbr === abbr || cId === String(id);
-        const score = parseFloat(c.score);
-        if (isNaN(score)) continue;
-        if (isMe) myScore = score;
-        else oppScore = score;
+        if (!isMe) {
+          // Try multiple score field locations
+          const score = parseFloat(c.score ?? c.team?.score ?? c.linescores?.reduce?.((a,b) => a + (b.value||0), 0) ?? NaN);
+          if (!isNaN(score)) oppScore = score;
+        }
       }
 
-      // If we couldn't identify by abbr/id, use homeAway field
-      if (oppScore === null) {
-        // Can't identify teams — try using scores array directly
-        // Just skip rather than guess wrong
-        continue;
+      if (oppScore !== null) {
+        totalPA += oppScore;
+        gamesFound++;
       }
-
-      totalPA += oppScore;
-      gamesFound++;
     }
 
     if (abbr === 'ARI') {
       console.log(`[PA Debug] ${abbr} ${year}: found ${gamesFound} games, totalPA=${totalPA}`);
-      // Log first competitor to see structure
-      const ev0 = events.find(e => e.competitions?.[0]?.status?.type?.completed);
-      if (ev0) {
-        console.log('[PA Debug] Sample competitor:', JSON.stringify(ev0.competitions[0].competitors[0]).slice(0, 300));
-      }
     }
-
     return gamesFound > 0 ? Math.round(totalPA) : 0;
   } catch(e) {
     console.warn(`[PA Debug] Error:`, e.message);
