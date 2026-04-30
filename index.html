@@ -788,23 +788,43 @@ async function fetchTeamPA(abbr, year) {
     let totalPA = 0, gamesFound = 0;
 
     const events = data.events || [];
+
+    // Debug first event to see exact structure
+    if (abbr === 'ARI' && events.length > 0) {
+      const ev0 = events[0];
+      const comp0 = ev0.competitions?.[0];
+      console.log('[PA Debug] First event keys:', Object.keys(ev0));
+      console.log('[PA Debug] seasonType:', ev0.seasonType);
+      console.log('[PA Debug] season:', ev0.season);
+      console.log('[PA Debug] status:', comp0?.status?.type);
+      console.log('[PA Debug] competitors scores:', comp0?.competitors?.map(c => ({team: c.team?.abbreviation, score: c.score, id: c.team?.id})));
+      console.log('[PA Debug] total events:', events.length);
+    }
+
     for (const ev of events) {
       const comp = ev.competitions?.[0];
       if (!comp) continue;
-      // Only completed games
-      if (!comp.status?.type?.completed) continue;
-      // Only regular season (seasonType.type = 2)
-      const sType = ev.seasonType?.type || ev.seasonType?.id || 0;
-      if (sType !== 2) continue;
 
-      // Find this team and opponent
-      const myTeam = comp.competitors?.find(c =>
-        String(c.team?.id) === String(id) || c.team?.abbreviation === abbr
-      );
+      // Check completion — try multiple paths ESPN uses
+      const completed = comp.status?.type?.completed ||
+                        comp.status?.type?.name === 'STATUS_FINAL' ||
+                        comp.status?.type?.state === 'post';
+      if (!completed) continue;
+
+      // Season type check — ESPN uses different structures
+      // Try every known path, default to including if we can't determine
+      const stType = ev.seasonType?.type ||
+                     ev.seasonType?.id ||
+                     ev.season?.type ||
+                     ev.season?.seasonType ||
+                     2; // default assume regular season if unknown
+      // 1=preseason, 2=regular, 3=postseason
+      if (stType === 1 || stType === 3) continue;
+
       const oppTeam = comp.competitors?.find(c =>
         String(c.team?.id) !== String(id) && c.team?.abbreviation !== abbr
       );
-      if (!myTeam || !oppTeam) continue;
+      if (!oppTeam) continue;
 
       const oppScore = parseFloat(oppTeam.score);
       if (!isNaN(oppScore) && oppScore >= 0) {
@@ -814,7 +834,7 @@ async function fetchTeamPA(abbr, year) {
     }
 
     if (abbr === 'ARI') {
-      console.log(`[PA Debug] ${abbr} ${year}: found ${gamesFound} completed regular season games, totalPA=${totalPA}`);
+      console.log(`[PA Debug] ${abbr} ${year}: found ${gamesFound} completed games, totalPA=${totalPA}`);
     }
 
     return gamesFound > 0 ? Math.round(totalPA) : 0;
