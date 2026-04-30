@@ -1161,16 +1161,32 @@ function rankGames(gs) {
 function calcAll() {
   const gs = wkGames();
   gs.forEach(g => { g.calc = calcGame(g); });
-  // Rank
-  const calculated = gs.filter(g => g.calc && g.calc.spreadDiff !== null);
-  if (calculated.length) {
-    // Ascending sort: smallest diff = rank 1 (least confident), largest diff = rank N (most confident = highest pts)
-    const sorted = [...calculated].sort((a, b) => (a.calc.spreadDiff||0) - (b.calc.spreadDiff||0));
-    sorted.forEach((g, i) => { g.calc.rank = i + 1; });
-  }
-  // Games without spread get no rank or equal middle
-  const noSpread = gs.filter(g => g.calc && g.calc.spreadDiff === null);
-  noSpread.forEach(g => { g.calc.rank = null; });
+
+  const n = gs.filter(g => g.calc).length;
+
+  // Split into: has spread diff (rankable) vs no spread (unrankable)
+  const withDiff  = gs.filter(g => g.calc && g.calc.spreadDiff !== null);
+  const noDiff    = gs.filter(g => g.calc && g.calc.spreadDiff === null);
+
+  // Sort by spreadDiff ascending: smallest = least confident = rank 1
+  // largest = most confident = rank N (highest Yahoo pts)
+  withDiff.sort((a, b) => (a.calc.spreadDiff||0) - (b.calc.spreadDiff||0));
+
+  // Assign ranks: no-spread games get middle ranks, spread games fill rest
+  // Strategy: no-spread games ranked in lower half, spread games fill sequentially
+  // Simpler: just assign ranks 1..withDiff.length to spread games,
+  // then assign remaining ranks to no-spread games (they go at bottom = low confidence)
+  withDiff.forEach((g, i) => { g.calc.rank = i + 1; });
+
+  // No-spread games get ranks above the spread games (they're unknown confidence)
+  // Actually put them at the bottom since we can't evaluate them
+  const startRank = withDiff.length + 1;
+  noDiff.forEach((g, i) => { g.calc.rank = startRank + i; });
+
+  // If ALL games have spreads, ranks are already 1-N correctly
+  // If some don't, user sees them ranked above the spread games
+  // Either way total rank count = total calculated games
+
   persist(); renderGames(); renderRanked(); renderResultsForm();
 }
 
@@ -1230,8 +1246,10 @@ function renderGames() {
 
 function gameCard(g) {
   const c = g.calc;
+  const totalGames = wkGames().filter(g => g.calc).length || 16;
   const rank = c?.rank;
-  const rankClass = !rank ? 'r-lo' : rank >= 14 ? 'r16' : rank >= 10 ? 'r-hi' : rank >= 6 ? 'r-mid' : 'r-lo';
+  const pct = rank ? rank / totalGames : 0;
+  const rankClass = !rank ? 'r-lo' : pct >= 0.875 ? 'r16' : pct >= 0.625 ? 'r-hi' : pct >= 0.375 ? 'r-mid' : 'r-lo';
   const dcClass = !c?.spreadDiff ? '' : c.spreadDiff >= 7 ? 'diff-0' : c.spreadDiff >= 3 ? 'diff-1' : 'diff-2';
   const spVal = g.spread !== null && g.spread !== '' ? parseFloat(g.spread) : null;
   const spLabel = spVal === null ? '—' : spVal < 0 ? `${g.visitor.team} -${Math.abs(spVal).toFixed(1)}` : spVal > 0 ? `${g.home.team} -${spVal.toFixed(1)}` : "Pick'em";
@@ -1339,8 +1357,8 @@ function renderRanked() {
   document.getElementById('ranked-body').innerHTML = sorted.map((g,i) => {
     const c = g.calc;
     const r = c.rank || '—';
-    const isTop = r >= n - 2;
-    const rnClass = r===n?'rn-gold':r===n-1?'rn-silver':r===n-2?'rn-bronze':r>=Math.ceil(n*.6)?'rn-hi':r>=Math.ceil(n*.3)?'rn-mid':'rn-lo';
+    const pct = r !== '—' ? r / n : 0;
+    const rnClass = pct >= 0.94 ? 'rn-gold' : pct >= 0.81 ? 'rn-silver' : pct >= 0.69 ? 'rn-bronze' : pct >= 0.5 ? 'rn-hi' : pct >= 0.25 ? 'rn-mid' : 'rn-lo';
     const dcClass = !c.spreadDiff?'':c.spreadDiff>=7?'diff-0':c.spreadDiff>=3?'diff-1':'diff-2';
     const spLabel = g.spread!==null&&g.spread!==''?
       (parseFloat(g.spread)<0?`${g.visitor.team} -${Math.abs(g.spread).toFixed(1)}`:parseFloat(g.spread)>0?`${g.home.team} -${parseFloat(g.spread).toFixed(1)}`:"Pick'em"):'—';
