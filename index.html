@@ -231,7 +231,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
   <div class="hdr-brand">
     <div>
       <div class="hdr-logo">NFL PREDICTOR</div>
-      <div class="hdr-sub">Phase 1 &bull; Powered by ESPN API</div>
+      <div class="hdr-sub">Phase 1</div>
     </div>
   </div>
   <div></div>
@@ -242,14 +242,14 @@ button:disabled{opacity:.4;cursor:not-allowed}
       <div class="hdr-stat"><div class="n" id="h-l" style="color:var(--red)">0</div><div class="l">Losses</div></div>
       <div class="hdr-stat"><div class="n" id="h-wks">0</div><div class="l">Weeks</div></div>
     </div>
-    <div class="api-status"><div class="dot" id="api-dot"></div><span id="api-txt">ESPN API</span></div>
+    <div class="api-status"><div class="dot" id="api-dot"></div><span id="api-txt">Auto Stats</span></div>
   </div>
 </div>
 
 <!-- NAV -->
 <!-- LOCAL FILE WARNING -->
 <div id="local-warn" style="display:none;background:#2a1500;border-bottom:1px solid #6a3500;padding:10px 20px;font-size:12px;color:#ffaa44;font-family:'DM Mono',monospace;display:flex;align-items:center;gap:10px">
-  ⚠ <strong>Local File Mode:</strong> ESPN team stats (PA, rankings) require the app to be hosted online due to browser security restrictions.
+  ⚠ <strong>Local File Mode:</strong> Stats auto-fetch requires the app to be hosted online due to browser security restrictions.
   <strong>Fix:</strong> Upload this file to your Netlify account — everything will work fully there.
   The scoreboard/schedule fetch still works locally. Stats fields will need manual entry until hosted.
   <button onclick="document.getElementById('local-warn').style.display='none'" style="margin-left:auto;background:none;border:1px solid #6a3500;color:#ffaa44;padding:3px 10px;cursor:pointer;border-radius:4px;font-size:11px">Dismiss</button>
@@ -267,7 +267,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 <!-- ===== PREDICTOR ===== -->
 <div id="tab-predictor" class="page on">
   <div class="ctrl">
-    <div class="ctrl-title">⚡ Auto-Fetch Week — All Stats from ESPN</div>
+    <div class="ctrl-title">⚡ Auto-Fetch This Week</div>
     <div class="ctrl-row">
       <div class="cg"><label>Season</label>
         <select id="yr">
@@ -375,7 +375,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
     <div id="bf-status"></div>
   </div>
   <div class="info">
-    Fetches every completed game from ESPN, runs your formula, compares against actual results.
+    Fetches every completed game, runs your formula, compares against actual results.
     Skips weeks you've manually entered. ~2–3 min per season. Runs in background.
   </div>
   <div id="bf-progress"></div>
@@ -402,7 +402,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
     <h3>Step 1 — Fetch</h3>
     <ul>
       <li>Select season and week, click <strong>Fetch Games + Stats</strong></li>
-      <li>ESPN auto-fills: matchups, spread, records, PF, PA, turnovers, all 4 ranking stats, yards/play, 3rd down %, time of possession</li>
+      <li>Auto-filled: matchups, spread, records, PF, PA, turnovers, all 4 ranking stats, yards/play, 3rd down %, time of possession</li>
     </ul>
   </div>
   <div class="howto-card">
@@ -525,7 +525,7 @@ function setDot(state) {
   const d = document.getElementById('api-dot');
   const t = document.getElementById('api-txt');
   d.className = 'dot' + (state==='ok'?'':state==='err'?' err':' spin-dot');
-  t.textContent = state==='ok'?'ESPN Connected':state==='err'?'ESPN Error':'Fetching...';
+  t.textContent = 'Auto Stats Connected':state==='err'?'Connection Error':'Fetching...';
 }
 async function apiFetch(url) {
   // Detect local file:// — CORS proxy won't work, ESPN direct may work
@@ -1192,7 +1192,7 @@ function renderGames() {
   const gs = wkGames();
   const wrap = document.getElementById('games-wrap');
   if (!gs.length) {
-    wrap.innerHTML = '<div class="empty"><strong>No Games Loaded</strong>Click "Fetch Games + Stats" to auto-load this week\'s matchups from ESPN.<br>All stats will be filled automatically.</div>';
+    wrap.innerHTML = '<div class="empty"><strong>No Games Loaded</strong>Click "Fetch Games + Stats" to auto-load this week\'s matchups.<br>All stats will be filled automatically.</div>';
     document.getElementById('ranked-section').style.display = 'none'; return;
   }
   wrap.innerHTML = gs.map(g => gameCard(g)).join('');
@@ -1218,7 +1218,7 @@ function gameCard(g) {
           <span style="color:var(--purple)">${g.visitor.fullName||g.visitor.team}</span>
         </div>
         <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px">
-          Wk ${g.week} · ${g.year} · ${g.autoFetched?'<span class="b-esp stag">ESPN</span>':'Manual'}
+          Wk ${g.week} · ${g.year} · ${g.autoFetched?'<span class="b-esp stag">AUTO</span>':'Manual'}
           ${g.isDivisional?'· <span style="color:var(--yellow)">DIVISION</span>':''}
           ${g.blendLabel?`· <span style="color:var(--manual-t);background:var(--manual);border-radius:3px;padding:1px 5px">⚗ BLENDED</span>`:''}
         </div>
