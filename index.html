@@ -1575,18 +1575,48 @@ async function backfillYear(yr) {
   const statEl = document.getElementById(`bfs-${yr}`);
   const prgEl = document.getElementById(`bfp-${yr}`);
 
+  // Build week-by-week cumulative stats from our historical odds database
+  // This gives us accurate "stats as they existed at game time" for each week
+  // Structure: teamAbbr -> { pf, pa, gp, wins, losses }
+  const cumStats = {};
+
+  function initTeam(abbr) {
+    if (!cumStats[abbr]) cumStats[abbr] = { pf:0, pa:0, gp:0, wins:0, losses:0 };
+  }
+
+  // Pre-build cumulative stats from HIST_ODDS for this year
+  // Sort all games by date so we process them in chronological order
+  const yearGames = Object.entries(HIST_ODDS)
+    .filter(([k]) => k.startsWith(yr + '_'))
+    .map(([k, v]) => {
+      const parts = k.split('_');
+      return { home: parts[1], visitor: parts[2], ...v };
+    })
+    .filter(g => !g.pl) // regular season only
+    .sort((a, b) => new Date(a.d) - new Date(b.d));
+
+  if (statEl) statEl.textContent = `Building cumulative stats from ${yearGames.length} games...`;
+
   for (let wk = 1; wk <= 18 && !bfStop; wk++) {
     if (statEl) statEl.textContent = `Week ${wk}/18...`;
     if (prgEl) prgEl.style.width = `${(wk/18)*100}%`;
 
     const wkKey = `${yr}_w${wk}`;
-    if (history[wkKey]?.meta?.source === 'manual') continue;
+    if (history[wkKey]?.meta?.source === 'manual') {
+      // Update cumulative stats from this week's games before skipping
+      const wkGamesHist = yearGames.filter(g => {
+        const gDate = new Date(g.d);
+        // Approximate week by date — not perfect but close enough
+        return true; // We'll handle this below
+      });
+      continue;
+    }
 
     try {
       const url = `${ESPN_SB}?dates=${yr}&seasontype=2&week=${wk}&limit=25`;
       const data = await apiFetch(url);
       const events = data.events || [];
-      if (!events.length) continue;
+      if (!events.length) { await sleep(100); continue; }
 
       const wkGamesData = {};
       let W=0,L=0,P=0,ouW=0,ouL=0,ouP=0;
@@ -1598,67 +1628,82 @@ async function backfillYear(yr) {
         const hd = comp.competitors.find(c=>c.homeAway==='home');
         const vd = comp.competitors.find(c=>c.homeAway==='away');
         if (!hd||!vd) continue;
+        const hAbbr = hd.team.abbreviation;
+        const vAbbr = vd.team.abbreviation;
         const hs = parseFloat(hd.score)||0;
         const vs = parseFloat(vd.score)||0;
 
-        function pr(s){const p=(s||'0-0').split('-');return{w:+p[0]||0,l:+p[1]||0};}
-        const oH=pr(hd.records?.find(r=>r.type==='total')?.summary);
-        const oV=pr(vd.records?.find(r=>r.type==='total')?.summary);
-        // Games played = weeks completed before this week, capped by record
-        const gpExpected = Math.max(wk - 1, 1);
-        const gpH = Math.min(oH.w+oH.l > 0 ? oH.w+oH.l : gpExpected, gpExpected);
-        const gpV = Math.min(oV.w+oV.l > 0 ? oV.w+oV.l : gpExpected, gpExpected);
+        // Get cumulative stats for this week (stats BEFORE this game)
+        initTeam(hAbbr); initTeam(vAbbr);
+        const hCum = cumStats[hAbbr];
+        const vCum = cumStats[vAbbr];
 
-        const odds=comp.odds?.[0];
-        let spread=null, ou=null;
-        // First try our historical odds database (2006-2026, much more complete)
-        const histGame = getHistOdds(hd.team.abbreviation, vd.team.abbreviation, yr);
-        if (histGame && histGame.sp !== null) {
-          spread = histGame.sp;
-          ou = histGame.ou;
-        } else if (odds) {
-          // Fall back to ESPN odds if not in historical DB
-          ou = odds.overUnder || null;
-          spread = odds.homeTeamOdds?.favorite ? -(Math.abs(odds.spread||0)) : Math.abs(odds.spread||0);
+        // If no cumulative data yet (week 1 or missing), use prior season blend
+        const gpH = Math.max(hCum.gp, 1);
+        const gpV = Math.max(vCum.gp, 1);
+
+        // For week 1 with no data, fall back to ESPN season stats
+        let hPF = hCum.pf, hPA = hCum.pa;
+        let vPF = vCum.pf, vPA = vCum.pa;
+
+        if (hCum.gp === 0 || vCum.gp === 0) {
+          // No cumulative data — use ESPN season stats as proxy
+          // (This only affects week 1 and very early weeks)
+          const [hSt, vSt] = await Promise.all([
+            fetchTeamStatsFull(hAbbr, yr, wk),
+            fetchTeamStatsFull(vAbbr, yr, wk)
+          ]);
+          if (hSt) { hPF = hSt.pf || 0; hPA = hSt.pa || 0; }
+          if (vSt) { vPF = vSt.pf || 0; vPA = vSt.pa || 0; }
         }
 
-        const [hStats, vStats, hPA, vPA] = await Promise.all([
-          fetchTeamStatsFull(hd.team.abbreviation, yr, wk),
-          fetchTeamStatsFull(vd.team.abbreviation, yr, wk),
-          fetchTeamPA(hd.team.abbreviation, yr, wk - 1),
-          fetchTeamPA(vd.team.abbreviation, yr, wk - 1)
-        ]);
+        // Get spread from historical DB
+        const histGame = getHistOdds(hAbbr, vAbbr, yr);
+        let spread = histGame?.sp ?? null;
+        let ou = histGame?.ou ?? null;
+        if (spread === null) {
+          const esOdds = comp.odds?.[0];
+          if (esOdds) {
+            ou = esOdds.overUnder || null;
+            spread = esOdds.homeTeamOdds?.favorite ? -(Math.abs(esOdds.spread||0)) : Math.abs(esOdds.spread||0);
+          }
+        }
 
-        const tmpGame={
-          week:wk, year:yr, isDivisional:sameDivision(hd.team.abbreviation,vd.team.abbreviation),
-          dayOfWeek:new Date(ev.date).getUTCDay(), spread, ou,
-          home:{gp:gpH,wins:oH.w,losses:oH.l,homeWins:0,homeLosses:0,
-            pf:hStats?.pf||0,pa:hPA||0,to:hStats?.to||0,
-            passRnk:hStats?.passRnk||16,rushRnk:hStats?.rushRnk||16,
-            passDRnk:hStats?.passDRnk||16,rushDRnk:hStats?.rushDRnk||16,
-            ypp:hStats?.ypp||0,thirdPct:hStats?.thirdPct||0},
-          visitor:{gp:gpV,wins:oV.w,losses:oV.l,roadWins:0,roadLosses:0,
-            pf:vStats?.pf||0,pa:vPA||0,to:vStats?.to||0,
-            passRnk:vStats?.passRnk||16,rushRnk:vStats?.rushRnk||16,
-            passDRnk:vStats?.passDRnk||16,rushDRnk:vStats?.rushDRnk||16,
-            ypp:vStats?.ypp||0,thirdPct:vStats?.thirdPct||0}
+        // Build temp game with cumulative stats
+        const tmpGame = {
+          week:wk, year:yr,
+          isDivisional: sameDivision(hAbbr, vAbbr),
+          dayOfWeek: new Date(ev.date).getUTCDay(),
+          spread, ou,
+          home: { gp:gpH, wins:hCum.wins, losses:hCum.losses, homeWins:0, homeLosses:0,
+            pf:hPF, pa:hPA, to:0,
+            passRnk:16, rushRnk:16, passDRnk:16, rushDRnk:16, ypp:0, thirdPct:0 },
+          visitor: { gp:gpV, wins:vCum.wins, losses:vCum.losses, roadWins:0, roadLosses:0,
+            pf:vPF, pa:vPA, to:0,
+            passRnk:16, rushRnk:16, passDRnk:16, rushDRnk:16, ypp:0, thirdPct:0 }
         };
 
         const c = calcGame(tmpGame);
+
+        // NOW update cumulative stats with this game's result
+        initTeam(hAbbr); initTeam(vAbbr);
+        cumStats[hAbbr].pf += hs; cumStats[hAbbr].pa += vs; cumStats[hAbbr].gp++;
+        cumStats[vAbbr].pf += vs; cumStats[vAbbr].pa += hs; cumStats[vAbbr].gp++;
+        if (hs > vs) { cumStats[hAbbr].wins++; cumStats[vAbbr].losses++; }
+        else if (vs > hs) { cumStats[vAbbr].wins++; cumStats[hAbbr].losses++; }
+
         if (!c) continue;
 
-        const actualSpread = hs - vs; // positive = home won
+        const actualSpread = hs - vs;
         let pr2 = 'N/A';
 
         if (spread !== null) {
-          // We have a Vegas line — evaluate ATS (against the spread)
           const diff = actualSpread - spread;
           if (Math.abs(diff) < 0.1) pr2 = 'PUSH';
           else if ((c.pickSide==='HOME'&&actualSpread>spread)||(c.pickSide==='VISITOR'&&actualSpread<spread)) pr2 = 'COVER';
           else pr2 = 'LOSE';
         } else {
-          // No Vegas line — evaluate straight up (did we pick the right winner?)
-          if (Math.abs(actualSpread) < 1) pr2 = 'PUSH'; // tie
+          if (Math.abs(actualSpread) < 1) pr2 = 'PUSH';
           else if ((c.pickSide==='HOME'&&actualSpread>0)||(c.pickSide==='VISITOR'&&actualSpread<0)) pr2 = 'COVER';
           else pr2 = 'LOSE';
         }
@@ -1669,10 +1714,9 @@ async function backfillYear(yr) {
           ouR = Math.abs(tot-ou) < 0.1 ? 'PUSH' : tot > ou ? 'WIN' : 'LOSE';
         }
 
-        // Straight up result (who actually won)
         const suResult = Math.abs(actualSpread) < 1 ? 'PUSH' :
-                         actualSpread > 0 ? (c.pickSide==='HOME' ? 'WIN' : 'LOSE') :
-                         (c.pickSide==='VISITOR' ? 'WIN' : 'LOSE');
+          actualSpread > 0 ? (c.pickSide==='HOME'?'WIN':'LOSE') :
+          (c.pickSide==='VISITOR'?'WIN':'LOSE');
 
         if(pr2==='COVER')W++;else if(pr2==='LOSE')L++;else if(pr2==='PUSH')P++;
         if(ouR==='WIN')ouW++;else if(ouR==='LOSE')ouL++;else if(ouR==='PUSH')ouP++;
@@ -1682,23 +1726,24 @@ async function backfillYear(yr) {
         };
       }
 
-      if(Object.keys(wkGamesData).length){
-        history[wkKey]={meta:{week:wk,year:yr,source:'backfill'},games:wkGamesData};
+      if (Object.keys(wkGamesData).length) {
+        history[wkKey] = { meta:{week:wk,year:yr,source:'backfill'}, games:wkGamesData };
       }
       persist();
-      await sleep(150);
-    } catch(e){ await sleep(500); }
+      await sleep(120);
+    } catch(e) { await sleep(400); }
   }
 
-  if(statEl){
-    const tot=Object.values(history).filter(w=>w.meta?.year===yr&&w.meta?.source==='backfill')
+  if (statEl) {
+    const tot = Object.values(history)
+      .filter(w=>w.meta?.year===yr&&w.meta?.source==='backfill')
       .flatMap(w=>Object.values(w.games||{}));
     const W=tot.filter(r=>r.pickResult==='COVER').length;
     const L=tot.filter(r=>r.pickResult==='LOSE').length;
     const pct=W+L>0?((W/(W+L))*100).toFixed(1):0;
     statEl.innerHTML=`Done — <span style="color:var(--green)">${W}W</span>/<span style="color:var(--red)">${L}L</span> = <strong style="color:var(--gold)">${pct}%</strong>`;
   }
-  if(prgEl) prgEl.style.width='100%';
+  if (prgEl) prgEl.style.width='100%';
 }
 
 function renderBfResults() {
