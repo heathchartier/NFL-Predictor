@@ -779,82 +779,39 @@ async function fetchTeamStatsFull(abbr, year, week) {
 // We calculate PA by fetching the team schedule and summing opponent scores.
 // Confirmed working endpoint: site.api.espn.com/teams/{id}/schedule
 // =====================================================================
-async function fetchTeamPA(abbr, year) {
-  const id = TEAM_IDS[abbr];
-  if (!id) return 0;
-  try {
-    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${id}/schedule?season=${year}`;
-    const data = await apiFetch(url);
-    let totalPA = 0, gamesFound = 0;
-    const events = data.events || [];
+// =====================================================================
+// FETCH POINTS AGAINST — uses weekly scoreboard (which has actual scores)
+// The schedule endpoint has no scores. The scoreboard endpoint does.
+// We fetch each week's scoreboard, find this team's game, sum opponent scores.
+// =====================================================================
+async function fetchTeamPA(abbr, year, gamesPlayed) {
+  if (!gamesPlayed || gamesPlayed <= 0) return 0;
+  let totalPA = 0, found = 0;
 
-    // Debug: log full structure of first completed game
-    if (abbr === 'ARI') {
-      const ev0 = events.find(e => {
-        const st = e.competitions?.[0]?.status?.type;
-        return st?.completed || st?.state === 'post';
-      });
-      if (ev0) {
-        const comp0 = ev0.competitions[0];
-        console.log('[PA Debug] Full first completed event:', JSON.stringify(ev0).slice(0, 800));
-        console.log('[PA Debug] comp keys:', Object.keys(comp0));
-        console.log('[PA Debug] Full competitors:', JSON.stringify(comp0.competitors));
+  for (let wk = 1; wk <= gamesPlayed; wk++) {
+    try {
+      const url = `${ESPN_SB}?dates=${year}&seasontype=2&week=${wk}&limit=25`;
+      const data = await apiFetch(url);
+      const events = data.events || [];
+      for (const ev of events) {
+        const comp = ev.competitions?.[0];
+        if (!comp?.status?.type?.completed) continue;
+        const competitors = comp.competitors || [];
+        // Find this team
+        const myTeam = competitors.find(c => c.team?.abbreviation === abbr);
+        const oppTeam = competitors.find(c => c.team?.abbreviation !== abbr);
+        if (!myTeam || !oppTeam) continue;
+        const oppScore = parseFloat(oppTeam.score);
+        if (!isNaN(oppScore)) { totalPA += oppScore; found++; break; }
       }
-    }
-
-    for (const ev of events) {
-      const comp = ev.competitions?.[0];
-      if (!comp) continue;
-
-      const status = comp.status?.type || {};
-      const completed = status.completed === true || status.state === 'post' || status.name === 'STATUS_FINAL';
-      if (!completed) continue;
-
-      const stType = parseInt(ev.seasonType?.type || ev.seasonType?.id || 2);
-      if (stType === 1 || stType === 3) continue;
-
-      const competitors = comp.competitors || [];
-      if (competitors.length < 2) continue;
-
-      // Find opponent — the competitor whose team abbreviation != abbr and id != our id
-      let oppScore = null;
-      for (const c of competitors) {
-        const cAbbr = c.team?.abbreviation || '';
-        const cId = String(c.team?.id || c.id || '');
-        const isMe = cAbbr === abbr || cId === String(id);
-        if (!isMe) {
-          // Try multiple score field locations
-          const score = parseFloat(c.score ?? c.team?.score ?? c.linescores?.reduce?.((a,b) => a + (b.value||0), 0) ?? NaN);
-          if (!isNaN(score)) oppScore = score;
-        }
-      }
-
-      if (oppScore !== null) {
-        totalPA += oppScore;
-        gamesFound++;
-      }
-    }
-
-    if (abbr === 'ARI') {
-      console.log(`[PA Debug] ${abbr} ${year}: found ${gamesFound} games, totalPA=${totalPA}`);
-    }
-    return gamesFound > 0 ? Math.round(totalPA) : 0;
-  } catch(e) {
-    console.warn(`[PA Debug] Error:`, e.message);
-    return 0;
+    } catch(e) {}
+    await sleep(50);
   }
+
+  if (abbr === 'ARI') console.log(`[PA Debug] ${abbr} ${year}: ${found} games found, totalPA=${totalPA}`);
+  return Math.round(totalPA);
 }
 
-// Also fetch defensive rankings from the standings/leaders endpoint
-async function fetchDefenseRanks(year) {
-  // Returns map of team abbr -> {passDRnk, rushDRnk}
-  try {
-    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/standings?season=${year}`;
-    const data = await apiFetch(url);
-    // Parse standings for defensive data if available
-    return {};
-  } catch(e) { return {}; }
-}
 async function fetchWeek() {
   curYear = parseInt(document.getElementById('yr').value);
   curWeek = parseInt(document.getElementById('wk').value);
@@ -892,7 +849,7 @@ async function fetchWeek() {
       // Fetch stats and PA simultaneously — PA comes from schedule since ESPN stats returns 0
       const [stats, pa] = await Promise.all([
         fetchTeamStatsFull(abbr, curYear, curWeek),
-        fetchTeamPA(abbr, curYear)
+        fetchTeamPA(abbr, curYear, curWeek - 1)
       ]);
       statsCache[abbr] = stats;
       paCache[abbr] = pa;
@@ -1639,8 +1596,8 @@ async function backfillYear(yr) {
         const [hStats, vStats, hPA, vPA] = await Promise.all([
           fetchTeamStatsFull(hd.team.abbreviation, yr, wk),
           fetchTeamStatsFull(vd.team.abbreviation, yr, wk),
-          fetchTeamPA(hd.team.abbreviation, yr),
-          fetchTeamPA(vd.team.abbreviation, yr)
+          fetchTeamPA(hd.team.abbreviation, yr, wk - 1),
+          fetchTeamPA(vd.team.abbreviation, yr, wk - 1)
         ]);
 
         const tmpGame={
