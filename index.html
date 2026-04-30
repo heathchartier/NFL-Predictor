@@ -496,6 +496,10 @@ function sameDivision(t1, t2) {
 
 let games = [], history = {}, curYear = 2025, curWeek = 1, bfStop = false;
 
+// Cache PA and scoreboard data to avoid redundant API calls
+const paCache = {};        // key: `${abbr}_${year}` -> totalPA
+const scoreboardCache = {}; // key: `${year}_w${week}` -> events array
+
 // =====================================================================
 // PERSISTENCE
 // =====================================================================
@@ -750,17 +754,6 @@ async function fetchTeamStatsFull(abbr, year, week) {
 
   if (!weights) {
     const cur = await fetchRawStats(abbr, year, 2);
-    // Debug: log ALL fields for first team so we can see exact structure
-    if (cur && Object.keys(TEAM_IDS).indexOf(abbr) === 0) {
-      console.log(`[ESPN Debug] ${abbr} ${year} ALL fields (${Object.keys(cur).length} total):`);
-      console.log('[ESPN Debug] Full object:', cur);
-      const ptFields = Object.keys(cur).filter(k =>
-        k.toLowerCase().includes('point') || k.toLowerCase().includes('score') ||
-        k.toLowerCase().includes('allow') || k.toLowerCase().includes('oppon')
-      );
-      console.log('[ESPN Debug] Points-related fields:', ptFields);
-      ptFields.forEach(f => console.log(`  ${f}: ${cur[f]}`));
-    }
     return cur ? parseStats(cur, gpCur) : null;
   }
 
@@ -786,30 +779,40 @@ async function fetchTeamStatsFull(abbr, year, week) {
 // =====================================================================
 async function fetchTeamPA(abbr, year, gamesPlayed) {
   if (!gamesPlayed || gamesPlayed <= 0) return 0;
-  let totalPA = 0, found = 0;
+
+  // Return cached value if already fetched this session
+  const cKey = `${abbr}_${year}`;
+  if (paCache[cKey] !== undefined) return paCache[cKey];
+
+  let totalPA = 0;
 
   for (let wk = 1; wk <= gamesPlayed; wk++) {
     try {
-      const url = `${ESPN_SB}?dates=${year}&seasontype=2&week=${wk}&limit=25`;
-      const data = await apiFetch(url);
-      const events = data.events || [];
+      // Cache each week's scoreboard so all 32 teams share the same fetch
+      const sbKey = `${year}_w${wk}`;
+      if (!scoreboardCache[sbKey]) {
+        const url = `${ESPN_SB}?dates=${year}&seasontype=2&week=${wk}&limit=25`;
+        const data = await apiFetch(url);
+        scoreboardCache[sbKey] = data.events || [];
+        await sleep(40);
+      }
+      const events = scoreboardCache[sbKey];
       for (const ev of events) {
         const comp = ev.competitions?.[0];
         if (!comp?.status?.type?.completed) continue;
         const competitors = comp.competitors || [];
-        // Find this team
         const myTeam = competitors.find(c => c.team?.abbreviation === abbr);
         const oppTeam = competitors.find(c => c.team?.abbreviation !== abbr);
         if (!myTeam || !oppTeam) continue;
         const oppScore = parseFloat(oppTeam.score);
-        if (!isNaN(oppScore)) { totalPA += oppScore; found++; break; }
+        if (!isNaN(oppScore)) { totalPA += oppScore; break; }
       }
     } catch(e) {}
-    await sleep(50);
   }
 
-  if (abbr === 'ARI') console.log(`[PA Debug] ${abbr} ${year}: ${found} games found, totalPA=${totalPA}`);
-  return Math.round(totalPA);
+  const result = Math.round(totalPA);
+  paCache[cKey] = result;
+  return result;
 }
 
 async function fetchWeek() {
