@@ -248,13 +248,6 @@ button:disabled{opacity:.4;cursor:not-allowed}
 
 <!-- NAV -->
 <!-- LOCAL FILE WARNING -->
-<div id="local-warn" style="display:none;background:#2a1500;border-bottom:1px solid #6a3500;padding:10px 20px;font-size:12px;color:#ffaa44;font-family:'DM Mono',monospace;display:flex;align-items:center;gap:10px">
-  ⚠ <strong>Local File Mode:</strong> Stats auto-fetch requires the app to be hosted online due to browser security restrictions.
-  <strong>Fix:</strong> Upload this file to your Netlify account — everything will work fully there.
-  The scoreboard/schedule fetch still works locally. Stats fields will need manual entry until hosted.
-  <button onclick="document.getElementById('local-warn').style.display='none'" style="margin-left:auto;background:none;border:1px solid #6a3500;color:#ffaa44;padding:3px 10px;cursor:pointer;border-radius:4px;font-size:11px">Dismiss</button>
-</div>
-
 <div class="nav">
   <div class="nav-tab on" onclick="showTab('predictor',this)">Weekly Predictor</div>
   <div class="nav-tab" onclick="showTab('results',this)">Enter Results</div>
@@ -525,7 +518,7 @@ function setDot(state) {
   const d = document.getElementById('api-dot');
   const t = document.getElementById('api-txt');
   d.className = 'dot' + (state==='ok'?'':state==='err'?' err':' spin-dot');
-  t.textContent = 'Auto Stats Connected':state==='err'?'Connection Error':'Fetching...';
+  t.textContent = state==='ok'?'Auto Stats Connected':state==='err'?'Connection Error':'Fetching...';
 }
 async function apiFetch(url) {
   // Detect local file:// — CORS proxy won't work, ESPN direct may work
@@ -544,7 +537,7 @@ async function apiFetch(url) {
         return await r2.json();
       } catch(e2) {
         // For stats endpoint failures on local file, return null gracefully
-        console.warn('[Local File Mode] Cannot fetch:', url, '— upload to Netlify for full stats access');
+
         return null;
       }
     }
@@ -560,12 +553,6 @@ async function apiFetch(url) {
 }
 
 // Check if running locally and warn user
-function checkLocalFileMode() {
-  if (window.location.protocol === 'file:') {
-    const warn = document.getElementById('local-warn');
-    if (warn) warn.style.display = 'block';
-  }
-}
 function setStatus(id, msg, cls) {
   const el = document.getElementById(id);
   if (el) el.innerHTML = `<span class="status ${cls}">${cls==='s-load'?'<div class="spinner"></div>':''}${msg}</span>`;
@@ -1782,7 +1769,6 @@ document.getElementById('wk').addEventListener('change', changeWeek);
 // BOOT
 // =====================================================================
 load();
-checkLocalFileMode();
 </script>
 </body>
 </html>
