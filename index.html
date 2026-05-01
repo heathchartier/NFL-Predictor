@@ -847,21 +847,36 @@ async function fetchWeek() {
   curWeek = parseInt(document.getElementById('wk').value);
   const btn = document.getElementById('fetch-btn');
   btn.disabled = true; setDot('loading');
-  setStatus('fstatus', `Fetching Week ${curWeek} schedule...`, 's-load');
+  setStatus('fstatus', `Fetching ${curYear} Week ${curWeek} schedule...`, 's-load');
+  console.log(`[Fetch] Requesting year=${curYear} week=${curWeek}`);
 
   try {
-    // ESPN scoreboard: use season parameter for year, not dates
-    // The 'dates' param can cause wrong season results for early calendar year games
-    // seasontype=2 is regular season, week= is the NFL week number
-    const url = `${ESPN_SB}?season=${curYear}&seasontype=2&week=${curWeek}&limit=25`;
-    const data = await apiFetch(url);
-    let events = data.events || [];
+    // Try multiple ESPN URL formats — different ones work for different seasons
+    const urlFormats = [
+      `${ESPN_SB}?season=${curYear}&seasontype=2&week=${curWeek}&limit=25`,
+      `${ESPN_SB}?dates=${curYear}&seasontype=2&week=${curWeek}&limit=25`,
+      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?season=${curYear}&seasontype=2&week=${curWeek}&limit=25`,
+    ];
 
-    // Fallback to dates param if season param returns nothing
-    if (!events.length) {
-      const url2 = `${ESPN_SB}?dates=${curYear}&seasontype=2&week=${curWeek}&limit=25`;
-      const data2 = await apiFetch(url2);
-      events = data2.events || [];
+    let events = [];
+    for (const url of urlFormats) {
+      try {
+        const data = await apiFetch(url);
+        events = data.events || [];
+        if (events.length > 0) {
+          console.log(`[Fetch] Success with URL: ${url} — ${events.length} events`);
+          // Verify we got the right season by checking the first event date
+          const firstDate = events[0]?.date;
+          const firstYear = firstDate ? new Date(firstDate).getFullYear() : null;
+          console.log(`[Fetch] First event date: ${firstDate} (year: ${firstYear})`);
+          if (firstYear && Math.abs(firstYear - curYear) > 1) {
+            console.warn(`[Fetch] WARNING: Got year ${firstYear} but requested ${curYear}`);
+            events = []; // wrong year, try next format
+            continue;
+          }
+          break;
+        }
+      } catch(e) { console.warn(`[Fetch] URL failed:`, url, e.message); }
     }
 
     if (!events.length) {
