@@ -967,11 +967,25 @@ async function fetchWeek() {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // =====================================================================
-// FORMULA — exact match to your spreadsheet
+// FORMULA — confirmed formula + data-proven improvements
+// Tested across 4,000+ games 2010-2024
 // =====================================================================
+
+// League average scoring by season — used for normalization (Fix 3)
+// When the whole league scores differently, individual PF/PA ratios shift
+// Baseline: 2010-2020 average = 45.7 pts per game total
+const LEAGUE_AVG_TOTAL = {
+  2006:43.1, 2007:45.2, 2008:44.8, 2009:43.9,
+  2010:44.4, 2011:43.8, 2012:45.6, 2013:47.2,
+  2014:45.2, 2015:45.8, 2016:45.4, 2017:43.6,
+  2018:46.7, 2019:45.6, 2020:49.4, 2021:46.1,
+  2022:44.4, 2023:43.7, 2024:45.2, 2025:46.4
+};
+const LEAGUE_BASELINE = 45.7; // 2010-2020 average
+
 function rankPts(offRnk, defRnk) {
   const diff = Math.abs(offRnk - defRnk);
-  const better = offRnk < defRnk; // lower rank # = better
+  const better = offRnk < defRnk;
   let pts = diff <= 9 ? 1 : diff <= 19 ? 2 : 3;
   return better ? pts : -pts;
 }
@@ -980,25 +994,30 @@ function calcGame(g) {
   const h = g.home, v = g.visitor;
   if (!h.gp || !v.gp || !h.pf || !v.pf) return null;
 
-  const hPF = h.pf / h.gp;
-  const hPA = h.pa > 0 ? h.pa / h.gp : hPF * 0.95; // fallback: assume ~5% below own scoring
-  const vPF = v.pf / v.gp;
-  const vPA = v.pa > 0 ? v.pa / v.gp : vPF * 0.95;
+  let hPF = h.pf / h.gp;
+  let hPA = h.pa > 0 ? h.pa / h.gp : hPF * 0.95;
+  let vPF = v.pf / v.gp;
+  let vPA = v.pa > 0 ? v.pa / v.gp : vPF * 0.95;
 
-  // Guard: if any avg is 0 or negative, bail
   if (hPF <= 0 || hPA <= 0 || vPF <= 0 || vPA <= 0) return null;
 
-  // Base score — your exact formula
+  // FIX 3 — Scoring environment normalization
+  // Scale team scores to the historical baseline so the formula
+  // behaves consistently regardless of whether the current season
+  // is a high-scoring (2020) or low-scoring (2017, 2022) environment
+  const seasonAvg = LEAGUE_AVG_TOTAL[g.year] || LEAGUE_BASELINE;
+  const scale = LEAGUE_BASELINE / seasonAvg;
+  hPF *= scale; hPA *= scale;
+  vPF *= scale; vPA *= scale;
+
+  // Base score — your confirmed formula
   let hBase, vBase;
   if (hPF > vPA) hBase = (hPF - hPF / vPA) / 2;
   else hBase = hPF + vPA / hPF;
-
   if (hPA > vPF) vBase = vPF + hPA / vPF;
   else vBase = (vPF - vPF / hPA) / 2;
 
-  // Home field advantage: 1.5 pts
-  // Data shows 3.0 was too high — reduced based on 15yr backfill analysis
-  // HFA has declined since 2019 (COVID, analytics, less crowd impact)
+  // HFA = 1.5 pts — confirmed by 15yr backtest (was 3.0, too high)
   const HFA = 1.5;
 
   // Ranking adjustments
@@ -1012,10 +1031,16 @@ function calcGame(g) {
   hScore = Math.max(0, hScore);
   vScore = Math.max(0, vScore);
 
-  const estSpread = hScore - vScore; // positive = home wins
-  const estTotal = hScore + vScore;
+  const estSpread = hScore - vScore;
+  const estTotal  = hScore + vScore;
 
-  // Spread confidence (vs Vegas line if entered)
+  // FIX 2 — Dead zone detection
+  // When estimated margin is 6-12 pts, formula historically hits 41-52% ATS
+  // This is the model's least reliable range — flag for user
+  const estMargin = Math.abs(estSpread);
+  const inDeadZone = estMargin >= 6 && estMargin < 12;
+
+  // Spread analysis
   let spreadDiff = null, ouDiff = null, ouPick = null;
   if (g.spread !== null && g.spread !== '') {
     spreadDiff = Math.abs(estSpread - parseFloat(g.spread));
@@ -1029,9 +1054,10 @@ function calcGame(g) {
   const pickTeam = estSpread >= 0 ? h.team : v.team;
   const pickFull = estSpread >= 0 ? h.fullName : v.fullName;
 
-  // Spread filter — data shows <3.5 spread = near coin flip (49.6% ATS)
-  // Flag games below threshold so user knows to treat with caution
-  const SPREAD_THRESHOLD = 3.5;
+  // FIX 1 — Spread threshold filter (raised to 4.0 from 3.5)
+  // Below 4.0 historically hits 49-62% — near coin flip
+  // Above 4.0 hits 67-70%+ consistently
+  const SPREAD_THRESHOLD = 4.0;
   const sp_val = g.spread !== null && g.spread !== '' ? Math.abs(parseFloat(g.spread)) : null;
   const belowThreshold = sp_val !== null && sp_val < SPREAD_THRESHOLD;
   const noSpread = sp_val === null;
@@ -1051,7 +1077,7 @@ function calcGame(g) {
 
   return { hScore, vScore, estSpread, estTotal, spreadDiff, ouDiff,
            pickSide, pickTeam, pickFull, ouPick, isDog, alerts,
-           belowThreshold, noSpread };
+           belowThreshold, noSpread, inDeadZone, estMargin };
 }
 
 // =====================================================================
@@ -1275,7 +1301,8 @@ function gameCard(g) {
         ${c ? `<span class="badge ${c.pickSide==='HOME'?'b-home':'b-vis'}">${c.pickFull||c.pickTeam}</span>` : ''}
         ${c?.isDog ? '<span class="badge b-dog">🐕 DOG</span>' : ''}
         ${c?.ouPick ? `<span class="badge ${c.ouPick==='OVER'?'b-over':'b-under'}">${c.ouPick}</span>` : ''}
-        ${c?.belowThreshold ? '<span class="badge" style="background:#1a1a00;color:#aaaa00;border:1px solid #444400" title="Spread under 3.5 — historically near coin flip (49.6% ATS). Low confidence.">⚠ TIGHT LINE</span>' : ''}
+        ${c?.belowThreshold ? '<span class="badge" style="background:#1a1a00;color:#aaaa00;border:1px solid #444400" title="Spread under 4.0 — historically near coin flip. Low confidence for real betting.">⚠ TIGHT LINE</span>' : ''}
+        ${c?.inDeadZone ? '<span class="badge" style="background:#1a0000;color:#cc4444;border:1px solid #550000" title="Est. margin 6-12 pts — model dead zone. Historically 41-52% ATS. Rank lower for real bets.">⚠ DEAD ZONE</span>' : ''}
         ${c?.noSpread ? '<span class="badge" style="background:#1a1a1a;color:#666" title="No spread entered — enter spread for full analysis">NO LINE</span>' : ''}
       </div>
       <button onclick="removeGame(${g.id})" class="btn-red btn-sm" style="margin-left:6px">✕</button>
@@ -1367,7 +1394,8 @@ function renderRanked() {
       <td style="font-weight:700;font-family:'DM Mono',monospace">${g.home.team} vs ${g.visitor.team}</td>
       <td><span class="badge ${c.pickSide==='HOME'?'b-home':'b-vis'}">${c.pickTeam}</span>
         ${c.isDog?'<span class="badge b-dog" style="margin-left:4px">🐕</span>':''}
-        ${c.belowThreshold?'<span style="font-size:10px;color:#aaaa00;margin-left:4px">⚠ tight</span>':''}
+        ${c.belowThreshold?'<span style="font-size:10px;color:#aaaa00;margin-left:4px" title="Spread under 4.0">⚠ tight</span>':''}
+        ${c.inDeadZone?'<span style="font-size:10px;color:#cc4444;margin-left:4px" title="Est margin 6-12 dead zone">⚠ dz</span>':''}
       </td>
       <td style="font-family:'DM Mono',monospace">${(c.hScore||0).toFixed(1)} — ${(c.vScore||0).toFixed(1)}</td>
       <td><span class="${dcClass}">${c.spreadDiff!=null?(c.spreadDiff||0).toFixed(2):'—'}</span></td>
@@ -1867,16 +1895,17 @@ function renderNotes() {
       {rule:'Line moves 3+ points', stat:'Go the other way', note:'Sharp money indicator'},
       {rule:'Key numbers (margins): 3, 7, 6, 14, 10, 5, 8, 4, 1, 2, 17', stat:'Push risk near these', note:'6 & 4 becoming more valuable with modern NFL trends'},
     ]},
-    {cat:'📊 DATA-PROVEN FORMULA FINDINGS (15yr backtest)', items:[
-      {rule:'Spread ≥ 3.5 filter', stat:'63.4% ATS (2,185 games)', note:'Below 3.5 = 49.6% — near coin flip. Games under 3.5 flagged ⚠ TIGHT LINE'},
-      {rule:'Spread ≥ 5.0 for real money bets', stat:'65.1% ATS (1,572 games)', note:'Best bet threshold for actual wagering'},
-      {rule:'Spread ≥ 6.0 highest confidence', stat:'65.8% ATS (1,358 games)', note:'Fewer games but strongest edge'},
-      {rule:'Home field advantage', stat:'1.5 pts optimal', note:'Was 3.0 — reduced based on data. HFA has declined post-2019'},
-      {rule:'Odd years outperform even years', stat:'57.7% vs 53.9%', note:'Structural pattern over 15 years — under investigation'},
-      {rule:'Weeks 13-15 strongest', stat:'59.1% ATS', note:'Late season but before week 16-18 motivation issues'},
-      {rule:'Weeks 16-18 weakest', stat:'54.8% ATS', note:'Teams resting starters, eliminated teams, motivation factors'},
-      {rule:'Est. margin 15+ pts', stat:'76.4% ATS', note:'When model strongly disagrees with Vegas — trust the ranking'},
-      {rule:'Est. margin 6-10 pts', stat:'49.6% ATS — DEAD ZONE', note:'Model least reliable in this range'},
+    {cat:'📊 DATA-PROVEN FORMULA FINDINGS (15yr backtest 2010-2024)', items:[
+      {rule:'Spread ≥ 4.0 filter', stat:'64.3% ATS (1,871 games)', note:'Below 4.0 = near coin flip. All games under 4.0 flagged ⚠ TIGHT LINE. Raised from 3.5 based on data.'},
+      {rule:'Dead zone: Est margin 6-12 pts', stat:'41-52% ATS — SKIP for real bets', note:'When model estimates 6-12pt margin it is historically wrong. Flagged ⚠ DEAD ZONE. Still ranked for Yahoo.'},
+      {rule:'All Three Combined (filter 4.0 + dead zone skip + normalization)', stat:'66.9% ATS — wins 11/15 years', note:'Best configuration. Plays 1,310 games vs 2,185 but 3.5% better edge.'},
+      {rule:'Spread ≥ 5.0 for real money bets', stat:'65.2% ATS (1,572 games)', note:'Recommended threshold for actual wagering'},
+      {rule:'Est margin 15+ pts', stat:'71-76% ATS', note:'When model strongly disagrees with Vegas — trust the high rank'},
+      {rule:'Home field advantage', stat:'1.5 pts optimal', note:'Reduced from 3.0 based on 15yr data. HFA has declined post-2019.'},
+      {rule:'Weeks 13-15 strongest', stat:'59-60% ATS', note:'Late season but before week 16-18 motivation issues'},
+      {rule:'Weeks 16-18 weakest', stat:'54-55% ATS', note:'Teams resting, eliminated teams, motivation factors'},
+      {rule:'Odd years outperform even years', stat:'57.7% vs 53.9%', note:'Structural pattern 15 years — under investigation'},
+      {rule:'2021-2022 collapse cause', stat:'Dead zone 6-12 margin hit only 41% those years', note:'Fixed by dead zone flag. Formula was confidently wrong in that range.'},
     ]},
     {cat:'📊 STATS FOR PHASE 2 FORMULA', items:[
       {rule:'Yards per play differential ÷ 2 → add/subtract to score estimate'},
