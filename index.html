@@ -620,7 +620,7 @@ async function fetchRawStats(abbr, year, seasonType) {
   // PRIMARY: site.api.espn.com/teams/statistics — confirmed working endpoint
   // Returns categories with stat arrays including name, value, rank
   try {
-    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${id}/statistics`;
+    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${id}/statistics?season=${year}&seasontype=${seasonType}`;
     const data = await apiFetch(url);
     const s = {};
 
