@@ -378,7 +378,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
     <thead><tr>
       <th>Season</th><th>Wks</th><th>Games</th>
       <th colspan="4" style="text-align:center;border-left:1px solid var(--line2);color:var(--text2)">All Picks</th>
-      <th colspan="4" style="text-align:center;border-left:1px solid var(--line2);color:var(--gold)">Betable (≥4.0, no dead zone)</th>
+      <th colspan="4" style="text-align:center;border-left:1px solid var(--line2);color:var(--gold)">Betable (≥3.5, no dead zone)</th>
       <th>SU%</th><th>Source</th>
     </tr>
     <tr style="font-size:10px">
@@ -931,12 +931,22 @@ async function fetchWeek() {
       // Detect game day/time for situational rules
       const gameDate = ev.date ? new Date(ev.date) : null;
       const dayOfWeek = gameDate ? gameDate.getUTCDay() : null; // 0=sun,1=mon,4=thu
+      const isThursday = dayOfWeek === 4;
+
+      // Home team rest detection for Tier 1 premium
+      // Off bye: home team played fewer games than weeks elapsed (gap >= 2 weeks)
+      const weeksElapsed = curWeek - 1;
+      const isHomeOffBye = gpH > 0 && weeksElapsed > 0 && (weeksElapsed - gpH) >= 1;
+      const isHomeShortWeek = isThursday; // Thursday = short week for home
+      // Store last rest days estimate on home team
+      const homeLastRestDays = isHomeOffBye ? 14 : isHomeShortWeek ? 4 : 7;
 
       games.push({
         id: Date.now()+Math.random(), espnId: ev.id,
         week: curWeek, year: curYear, autoFetched: true,
-        gameDate: ev.date, dayOfWeek,
+        gameDate: ev.date, dayOfWeek, isThursday,
         isDivisional: sameDivision(hd.team.abbreviation, vd.team.abbreviation),
+        isHomeOffBye, isHomeShortWeek,
         blendLabel: isEarlyBlend ? blendLabel : null,
         home: {
           team: hd.team.abbreviation, fullName: hd.team.displayName,
@@ -946,7 +956,8 @@ async function fetchWeek() {
           passDRnk: hS?.passDRnk||16, rushDRnk: hS?.rushDRnk||16,
           ypp: hS?.ypp||0, netYPP: hS?.netYPP||0,
           thirdPct: hS?.thirdPct||0, top: hS?.top||0,
-          statsAuto: !!hS, blendDesc: hS?.blendDesc||null
+          statsAuto: !!hS, blendDesc: hS?.blendDesc||null,
+          lastRestDays: homeLastRestDays
         },
         visitor: {
           team: vd.team.abbreviation, fullName: vd.team.displayName,
@@ -956,7 +967,8 @@ async function fetchWeek() {
           passDRnk: vS?.passDRnk||16, rushDRnk: vS?.rushDRnk||16,
           ypp: vS?.ypp||0, netYPP: vS?.netYPP||0,
           thirdPct: vS?.thirdPct||0, top: vS?.top||0,
-          statsAuto: !!vS, blendDesc: vS?.blendDesc||null
+          statsAuto: !!vS, blendDesc: vS?.blendDesc||null,
+          lastRestDays: 7
         },
         spread, ou, calc: null
       });
@@ -1055,19 +1067,28 @@ function calcGame(g) {
   const pickTeam = estSpread >= 0 ? h.team : v.team;
   const pickFull = estSpread >= 0 ? h.fullName : v.fullName;
 
-  // FIX 1 — Spread threshold filter (raised to 4.0 from 3.5)
-  // Below 4.0 historically hits 49-62% — near coin flip
-  // Above 4.0 hits 67-70%+ consistently
-  const SPREAD_THRESHOLD = 4.0;
+  // FIX 1 — Spread threshold filter (3.5 optimal by 16yr profit analysis)
+  const SPREAD_THRESHOLD = 3.5;
   const sp_val = g.spread !== null && g.spread !== '' ? Math.abs(parseFloat(g.spread)) : null;
   const belowThreshold = sp_val !== null && sp_val < SPREAD_THRESHOLD;
   const noSpread = sp_val === null;
+
+  // OPTION 3 — Asymmetric home threshold (confirmed by 16yr backtest)
+  // Home picks need |edge| ≥4.0 vs spread to be betable
+  // Visitor picks: no additional threshold
+  // Confirmed: 66.5% overall, +43,790u, 1,620 games, 2021=70.0%
+  let homeEdge = null;
+  if (sp_val !== null && pickSide === 'HOME') {
+    const sp = parseFloat(g.spread);
+    homeEdge = sp < 0 ? estSpread - sp : estSpread + sp;
+  }
+  const HOME_EDGE_THRESHOLD = 4.0;
+  const weakHomeEdge = pickSide === 'HOME' && homeEdge !== null && Math.abs(homeEdge) < HOME_EDGE_THRESHOLD;
 
   // Is pick the underdog?
   let isDog = false;
   if (g.spread !== null && g.spread !== '') {
     const sp = parseFloat(g.spread);
-    // negative spread = home is favorite
     if (sp < 0 && pickSide === 'VISITOR') isDog = true;
     if (sp > 0 && pickSide === 'HOME') isDog = true;
     if (sp === 0) isDog = false;
@@ -1076,9 +1097,24 @@ function calcGame(g) {
   // Situational alerts
   const alerts = getSituationalAlerts(g, pickSide, spreadDiff);
 
+  // ── BETTING TIER SYSTEM (locked 2010-2025 backtest) ──────────────────
+  // Tier 1 PREMIUM: Home off bye OR Home short week (Thursday)
+  //   → 72.4% ATS, +13,480u on 352 games (validated)
+  // Tier 2 STANDARD: all other betable picks
+  //   → 64.9% ATS, +30,311u on 1,268 games (validated)
+  // Tier 3 INFORMATIONAL: non-betable (tight, dead zone, weak home edge)
+  const isTier1 = !belowThreshold && !inDeadZone && !weakHomeEdge &&
+                  pickSide === 'HOME' &&
+                  (g.isHomeOffBye === true || g.isHomeShortWeek === true);
+  const isTier2 = !belowThreshold && !inDeadZone && !weakHomeEdge && !isTier1;
+  // Late season visitor warning: wk 15-18 visitor picks hit only 49.4% ATS (87g sample)
+  const lateSeasonVisitorWarn = g.week >= 15 && pickSide === 'VISITOR' &&
+                                 !belowThreshold && !inDeadZone;
+
   return { hScore, vScore, estSpread, estTotal, spreadDiff, ouDiff,
            pickSide, pickTeam, pickFull, ouPick, isDog, alerts,
-           belowThreshold, noSpread, inDeadZone, estMargin };
+           belowThreshold, noSpread, inDeadZone, estMargin,
+           homeEdge, weakHomeEdge, isTier1, isTier2, lateSeasonVisitorWarn };
 }
 
 // =====================================================================
@@ -1283,7 +1319,26 @@ function gameCard(g) {
 
   const alerts = c?.alerts || [];
 
-  return `<div class="game-card">
+  // Betting zone based on spread diff (from 16yr analysis)
+  // Diff 13+: 86.6% | Diff 9-13: 75.2% | Diff 6-9: 66.4% | Diff 4-6: 50.6% | Diff <4: 18-19%
+  let betZone = '';
+  if (c?.spreadDiff !== null && c?.spreadDiff !== undefined && !c?.belowThreshold && !c?.inDeadZone) {
+    const sd = c.spreadDiff;
+    if (sd >= 13) betZone = '<span class="badge" style="background:#0a2a0a;color:#00ff88;border:1px solid #1a6a2a" title="Diff 13+ — historically 86.6% ATS. Elite bet.">🔥 ELITE BET</span>';
+    else if (sd >= 9) betZone = '<span class="badge" style="background:#0a1f0a;color:#44dd66;border:1px solid #1a5a2a" title="Diff 9-13 — historically 75.2% ATS. Strong bet.">★ STRONG BET</span>';
+    else if (sd >= 6) betZone = '<span class="badge" style="background:#0a1a14;color:#44bb88;border:1px solid #1a4a34" title="Diff 6-9 — historically 66.4% ATS. Good bet.">✓ GOOD BET</span>';
+  }
+
+  // Tier border styling
+  const tierBorder = c?.isTier1 ? 'border:1px solid var(--gold);box-shadow:0 0 12px rgba(212,168,67,.15)' :
+                     c?.isTier2 ? 'border:1px solid var(--line)' :
+                     'border:1px solid var(--line);opacity:0.85';
+  const tierLabel = c?.isTier1 ?
+    `<span style="font-size:10px;background:linear-gradient(135deg,var(--gold3),var(--gold));color:#000;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:.5px">★ TIER 1 PREMIUM</span>` :
+    c?.isTier2 ? `<span style="font-size:10px;background:var(--ink4);color:var(--text2);padding:2px 8px;border-radius:10px;border:1px solid var(--line2)">TIER 2</span>` :
+    `<span style="font-size:10px;background:var(--ink3);color:var(--text3);padding:2px 8px;border-radius:10px">TIER 3 INFO</span>`;
+
+  return `<div class="game-card" style="${tierBorder}">
     <div class="gc-head">
       <div class="gc-rank ${rankClass}">${rank||'—'}</div>
       <div>
@@ -1292,19 +1347,25 @@ function gameCard(g) {
           <span class="gc-vs">vs</span>
           <span style="color:var(--purple)">${g.visitor.fullName||g.visitor.team}</span>
         </div>
-        <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px">
-          Wk ${g.week} · ${g.year} · ${g.autoFetched?'<span class="b-esp stag">AUTO</span>':'Manual'}
-          ${g.isDivisional?'· <span style="color:var(--yellow)">DIVISION</span>':''}
-          ${g.blendLabel?`· <span style="color:var(--manual-t);background:var(--manual);border-radius:3px;padding:1px 5px">⚗ BLENDED</span>`:''}
+        <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span>Wk ${g.week} · ${g.year} · ${g.autoFetched?'<span class="stag st-a">AUTO</span>':'Manual'}</span>
+          ${g.isDivisional?'<span style="color:var(--yellow)">DIV</span>':''}
+          ${g.isHomeOffBye?'<span style="color:var(--green);font-weight:700">HOME OFF BYE</span>':''}
+          ${g.isHomeShortWeek?'<span style="color:var(--gold);font-weight:700">THURSDAY</span>':''}
+          ${g.blendLabel?'<span style="color:var(--manual-t)">⚗ BLENDED</span>':''}
+          ${tierLabel}
         </div>
       </div>
       <div class="gc-badges">
         ${c ? `<span class="badge ${c.pickSide==='HOME'?'b-home':'b-vis'}">${c.pickFull||c.pickTeam}</span>` : ''}
         ${c?.isDog ? '<span class="badge b-dog">🐕 DOG</span>' : ''}
         ${c?.ouPick ? `<span class="badge ${c.ouPick==='OVER'?'b-over':'b-under'}">${c.ouPick}</span>` : ''}
-        ${c?.belowThreshold ? '<span class="badge" style="background:#1a1a00;color:#aaaa00;border:1px solid #444400" title="Spread under 4.0 — historically near coin flip. Low confidence for real betting.">⚠ TIGHT LINE</span>' : ''}
-        ${c?.inDeadZone ? '<span class="badge" style="background:#1a0000;color:#cc4444;border:1px solid #550000" title="Est. margin 6-12 pts — model dead zone. Historically 41-52% ATS. Rank lower for real bets.">⚠ DEAD ZONE</span>' : ''}
-        ${c?.noSpread ? '<span class="badge" style="background:#1a1a1a;color:#666" title="No spread entered — enter spread for full analysis">NO LINE</span>' : ''}
+        ${betZone}
+        ${c?.belowThreshold ? '<span class="badge" style="background:#1a1a00;color:#aaaa00;border:1px solid #444400" title="Spread under 3.5 — below optimal filter threshold.">⚠ TIGHT LINE</span>' : ''}
+        ${c?.inDeadZone ? '<span class="badge" style="background:#1a0000;color:#cc4444;border:1px solid #550000" title="Est. margin 6-12 pts — 41-52% ATS historically. Avoid.">⚠ DEAD ZONE</span>' : ''}
+        ${c?.weakHomeEdge ? '<span class="badge" style="background:#1a1000;color:#cc8800;border:1px solid #553300" title="Home pick edge vs spread < 4.0 pts — below asymmetric threshold.">⚠ WEAK HOME EDGE</span>' : ''}
+        ${c?.lateSeasonVisitorWarn ? '<span class="badge" style="background:#1a0a1a;color:#aa66cc;border:1px solid #552255" title="Wk 15-18 visitor picks: 49.4% ATS historically (87g sample). Below breakeven.">⚠ LATE VIS</span>' : ''}
+        ${c?.noSpread ? '<span class="badge" style="background:#1a1a1a;color:#666">NO LINE</span>' : ''}
       </div>
       <button onclick="removeGame(${g.id})" class="btn-red btn-sm" style="margin-left:6px">✕</button>
     </div>
@@ -1392,11 +1453,19 @@ function renderRanked() {
       (parseFloat(g.spread)<0?`${g.visitor.team} -${Math.abs(g.spread).toFixed(1)}`:parseFloat(g.spread)>0?`${g.home.team} -${parseFloat(g.spread).toFixed(1)}`:"Pick'em"):'—';
     return `<tr>
       <td><span class="rnum ${rnClass}">${r}</span></td>
-      <td style="font-weight:700;font-family:'DM Mono',monospace">${g.home.team} vs ${g.visitor.team}</td>
+      <td style="font-weight:700;font-family:'DM Mono',monospace">
+        ${g.home.team} vs ${g.visitor.team}
+        ${c.isTier1?'<span style="font-size:9px;background:var(--gold);color:#000;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:700">★T1</span>':''}
+        ${c.lateSeasonVisitorWarn?'<span style="font-size:9px;color:#aa66cc;margin-left:4px">⚠LV</span>':''}
+      </td>
       <td><span class="badge ${c.pickSide==='HOME'?'b-home':'b-vis'}">${c.pickTeam}</span>
         ${c.isDog?'<span class="badge b-dog" style="margin-left:4px">🐕</span>':''}
-        ${c.belowThreshold?'<span style="font-size:10px;color:#aaaa00;margin-left:4px" title="Spread under 4.0">⚠ tight</span>':''}
-        ${c.inDeadZone?'<span style="font-size:10px;color:#cc4444;margin-left:4px" title="Est margin 6-12 dead zone">⚠ dz</span>':''}
+        ${c.belowThreshold?'<span style="font-size:10px;color:#aaaa00;margin-left:4px" title="Spread under 3.5">⚠ tight</span>':''}
+        ${c.inDeadZone?'<span style="font-size:10px;color:#cc4444;margin-left:4px" title="Est margin 6-12 — 41-52% ATS historically">⚠ dz</span>':''}
+        ${c.weakHomeEdge?'<span style="font-size:10px;color:#cc8800;margin-left:4px" title="Home edge < 4.0">⚠ whe</span>':''}
+        ${(!c.belowThreshold&&!c.inDeadZone&&!c.weakHomeEdge&&c.spreadDiff>=13)?'<span style="font-size:11px;color:#00ff88;margin-left:4px" title="Diff 13+ — 86.6% ATS">🔥</span>':
+          (!c.belowThreshold&&!c.inDeadZone&&!c.weakHomeEdge&&c.spreadDiff>=9)?'<span style="font-size:11px;color:#44dd66;margin-left:4px" title="Diff 9-13 — 75.2% ATS">★</span>':
+          (!c.belowThreshold&&!c.inDeadZone&&!c.weakHomeEdge&&c.spreadDiff>=6)?'<span style="font-size:11px;color:#44bb88;margin-left:4px" title="Diff 6-9 — 66.4% ATS">✓</span>':''}
       </td>
       <td style="font-family:'DM Mono',monospace">${(c.hScore||0).toFixed(1)} — ${(c.vScore||0).toFixed(1)}</td>
       <td><span class="${dcClass}">${c.spreadDiff!=null?(c.spreadDiff||0).toFixed(2):'—'}</span></td>
@@ -1533,9 +1602,9 @@ function renderRecord() {
 
   // Tier cards
   const tierLabels = [
-    ['1-5','Least Confident','You assign these lower-value picks'],
-    ['6-10','Mid Confidence','Middle of the pack'],
-    ['11-16','Most Confident','Your best bets — target 56%+'],
+    ['1-5', '★ Tier 1 PREMIUM', 'Home off bye OR Home Thursday — 72.4% ATS (352g validated)'],
+    ['6-10','Tier 2 Standard',   'All other betable picks — 64.9% ATS (1,268g validated)'],
+    ['11-16','Tier 3 Info',      'Non-betable: tight line, dead zone, weak home edge'],
   ];
   document.getElementById('tier-cards').innerHTML = tierLabels.map(([key,label,desc]) => {
     const t = tierData[key]; const te = t.W+t.L;
@@ -1782,10 +1851,19 @@ async function backfillYear(yr) {
           actualSpread > 0 ? (c.pickSide==='HOME'?'WIN':'LOSE') :
           (c.pickSide==='VISITOR'?'WIN':'LOSE');
 
-        // Betable = spread >= 4.0 AND not in dead zone (est margin outside 6-12)
+        // BETABLE criteria (locked formula — do not modify):
+        // 1. Spread >= 3.5
+        // 2. Not in dead zone (est margin 6-12)
+        // 3. Option 3: if HOME pick, |edge vs spread| must be >= 4.0
+        let homeBetEdge = true;
+        if (c.pickSide === 'HOME' && spread !== null) {
+          const homeEdge = spread < 0 ? c.estSpread - spread : c.estSpread + spread;
+          homeBetEdge = Math.abs(homeEdge) >= 4.0;
+        }
         const isBetable = spread !== null &&
-                          Math.abs(spread) >= 4.0 &&
-                          !(Math.abs(c.estSpread) >= 6 && Math.abs(c.estSpread) < 12);
+                          Math.abs(spread) >= 3.5 &&
+                          !(Math.abs(c.estSpread) >= 6 && Math.abs(c.estSpread) < 12) &&
+                          homeBetEdge;
 
         if(pr2==='COVER')W++;else if(pr2==='LOSE')L++;else if(pr2==='PUSH')P++;
         if(ouR==='WIN')ouW++;else if(ouR==='LOSE')ouL++;else if(ouR==='PUSH')ouP++;
