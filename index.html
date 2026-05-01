@@ -818,7 +818,7 @@ async function fetchTeamPA(abbr, year, gamesPlayed) {
       // Cache each week's scoreboard so all 32 teams share the same fetch
       const sbKey = `${year}_w${wk}`;
       if (!scoreboardCache[sbKey]) {
-        const url = `${ESPN_SB}?season=${year}&seasontype=2&week=${wk}&limit=25`;
+        const url = `${ESPN_SB}?dates=${year}&seasontype=2&week=${wk}&limit=25`;
         const data = await apiFetch(url);
         scoreboardCache[sbKey] = data.events || [];
         await sleep(40);
@@ -848,36 +848,13 @@ async function fetchWeek() {
   const btn = document.getElementById('fetch-btn');
   btn.disabled = true; setDot('loading');
   setStatus('fstatus', `Fetching ${curYear} Week ${curWeek} schedule...`, 's-load');
-  console.log(`[Fetch] Requesting year=${curYear} week=${curWeek}`);
 
   try {
-    // Try multiple ESPN URL formats — different ones work for different seasons
-    const urlFormats = [
-      `${ESPN_SB}?season=${curYear}&seasontype=2&week=${curWeek}&limit=25`,
-      `${ESPN_SB}?dates=${curYear}&seasontype=2&week=${curWeek}&limit=25`,
-      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?season=${curYear}&seasontype=2&week=${curWeek}&limit=25`,
-    ];
-
-    let events = [];
-    for (const url of urlFormats) {
-      try {
-        const data = await apiFetch(url);
-        events = data.events || [];
-        if (events.length > 0) {
-          console.log(`[Fetch] Success with URL: ${url} — ${events.length} events`);
-          // Verify we got the right season by checking the first event date
-          const firstDate = events[0]?.date;
-          const firstYear = firstDate ? new Date(firstDate).getFullYear() : null;
-          console.log(`[Fetch] First event date: ${firstDate} (year: ${firstYear})`);
-          if (firstYear && Math.abs(firstYear - curYear) > 1) {
-            console.warn(`[Fetch] WARNING: Got year ${firstYear} but requested ${curYear}`);
-            events = []; // wrong year, try next format
-            continue;
-          }
-          break;
-        }
-      } catch(e) { console.warn(`[Fetch] URL failed:`, url, e.message); }
-    }
+    // dates= is the confirmed working ESPN parameter for historical season fetching
+    // season= parameter always returns current season regardless of year value
+    const url = `${ESPN_SB}?dates=${curYear}&seasontype=2&week=${curWeek}&limit=25`;
+    const data = await apiFetch(url);
+    const events = data.events || [];
 
     if (!events.length) {
       setStatus('fstatus', `No games found for ${curYear} Week ${curWeek}.`, 's-err');
@@ -1772,7 +1749,7 @@ async function backfillYear(yr) {
     }
 
     try {
-      const url = `${ESPN_SB}?season=${yr}&seasontype=2&week=${wk}&limit=25`;
+      const url = `${ESPN_SB}?dates=${yr}&seasontype=2&week=${wk}&limit=25`;
       const data = await apiFetch(url);
       const events = data.events || [];
       if (!events.length) { await sleep(100); continue; }
