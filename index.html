@@ -375,8 +375,18 @@ button:disabled{opacity:.4;cursor:not-allowed}
   <div class="sec-title">Results by Season</div>
   <div class="scroll">
   <table class="dtable">
-    <thead><tr><th>Season</th><th>Weeks</th><th>Games</th><th>W</th><th>L</th><th>Push</th>
-      <th>ATS Win%</th><th>SU Win%</th><th>Note</th><th>O/U W</th><th>O/U L</th><th>O/U%</th></tr></thead>
+    <thead><tr>
+      <th>Season</th><th>Wks</th><th>Games</th>
+      <th colspan="4" style="text-align:center;border-left:1px solid var(--line2);color:var(--text2)">All Picks</th>
+      <th colspan="4" style="text-align:center;border-left:1px solid var(--line2);color:var(--gold)">Betable (≥4.0, no dead zone)</th>
+      <th>SU%</th><th>Source</th>
+    </tr>
+    <tr style="font-size:10px">
+      <th></th><th></th><th></th>
+      <th style="border-left:1px solid var(--line2)">W</th><th>L</th><th>Push</th><th>Win%</th>
+      <th style="border-left:1px solid var(--line2)">W</th><th>L</th><th>Games</th><th>Win%</th>
+      <th></th><th></th>
+    </tr></thead>
     <tbody id="bf-results"></tbody>
   </table>
   </div>
@@ -1000,15 +1010,6 @@ function calcGame(g) {
   let vPA = v.pa > 0 ? v.pa / v.gp : vPF * 0.95;
 
   if (hPF <= 0 || hPA <= 0 || vPF <= 0 || vPA <= 0) return null;
-
-  // FIX 3 — Scoring environment normalization
-  // Scale team scores to the historical baseline so the formula
-  // behaves consistently regardless of whether the current season
-  // is a high-scoring (2020) or low-scoring (2017, 2022) environment
-  const seasonAvg = LEAGUE_AVG_TOTAL[g.year] || LEAGUE_BASELINE;
-  const scale = LEAGUE_BASELINE / seasonAvg;
-  hPF *= scale; hPA *= scale;
-  vPF *= scale; vPA *= scale;
 
   // Base score — your confirmed formula
   let hBase, vBase;
@@ -1781,11 +1782,17 @@ async function backfillYear(yr) {
           actualSpread > 0 ? (c.pickSide==='HOME'?'WIN':'LOSE') :
           (c.pickSide==='VISITOR'?'WIN':'LOSE');
 
+        // Betable = spread >= 4.0 AND not in dead zone (est margin outside 6-12)
+        const isBetable = spread !== null &&
+                          Math.abs(spread) >= 4.0 &&
+                          !(Math.abs(c.estSpread) >= 6 && Math.abs(c.estSpread) < 12);
+
         if(pr2==='COVER')W++;else if(pr2==='LOSE')L++;else if(pr2==='PUSH')P++;
         if(ouR==='WIN')ouW++;else if(ouR==='LOSE')ouL++;else if(ouR==='PUSH')ouP++;
         if(pr2!=='N/A') wkGamesData[ev.id]={
           hScore:hs, vScore:vs, pickResult:pr2, ouResult:ouR,
-          suResult, rank:null, isDog:c.isDog, hadSpread:spread!==null
+          suResult, rank:null, isDog:c.isDog,
+          hadSpread:spread!==null, isBetable
         };
       }
 
@@ -1804,7 +1811,12 @@ async function backfillYear(yr) {
     const W=tot.filter(r=>r.pickResult==='COVER').length;
     const L=tot.filter(r=>r.pickResult==='LOSE').length;
     const pct=W+L>0?((W/(W+L))*100).toFixed(1):0;
-    statEl.innerHTML=`Done — <span style="color:var(--green)">${W}W</span>/<span style="color:var(--red)">${L}L</span> = <strong style="color:var(--gold)">${pct}%</strong>`;
+    // Betable only (spread>=4.0, not dead zone)
+    const bet=tot.filter(r=>r.isBetable);
+    const bW=bet.filter(r=>r.pickResult==='COVER').length;
+    const bL=bet.filter(r=>r.pickResult==='LOSE').length;
+    const bPct=bW+bL>0?((bW/(bW+bL))*100).toFixed(1):0;
+    statEl.innerHTML=`All: <span style="color:var(--green)">${W}W</span>/<span style="color:var(--red)">${L}L</span>=<strong style="color:var(--gold)">${pct}%</strong> &nbsp;|&nbsp; Betable: <span style="color:var(--green)">${bW}W</span>/<span style="color:var(--red)">${bL}L</span>=<strong style="color:var(--gold2)">${bPct}%</strong>`;
   }
   if (prgEl) prgEl.style.width='100%';
 }
@@ -1814,39 +1826,61 @@ function renderBfResults() {
   Object.entries(history).forEach(([wk,wd])=>{
     if(!wd.meta?.year||wd.meta?.source!=='backfill') return;
     const y=wd.meta.year;
-    if(!byYear[y]) byYear[y]={wks:0,W:0,L:0,P:0,ouW:0,ouL:0,ats:0,su:0,suW:0,suL:0};
+    if(!byYear[y]) byYear[y]={wks:0,W:0,L:0,P:0,bW:0,bL:0,bP:0,ouW:0,ouL:0,suW:0,suL:0,ats:0,su:0};
     byYear[y].wks++;
     Object.values(wd.games||{}).forEach(r=>{
-      if(r.pickResult==='COVER')byYear[y].W++;
-      else if(r.pickResult==='LOSE')byYear[y].L++;
-      else if(r.pickResult==='PUSH')byYear[y].P++;
-      if(r.ouResult==='WIN')byYear[y].ouW++;
-      else if(r.ouResult==='LOSE')byYear[y].ouL++;
+      if(r.pickResult==='COVER'){byYear[y].W++;if(r.isBetable)byYear[y].bW++;}
+      else if(r.pickResult==='LOSE'){byYear[y].L++;if(r.isBetable)byYear[y].bL++;}
+      else if(r.pickResult==='PUSH'){byYear[y].P++;if(r.isBetable)byYear[y].bP++;}
+      if(r.ouResult==='WIN')byYear[y].ouW++;else if(r.ouResult==='LOSE')byYear[y].ouL++;
       if(r.hadSpread)byYear[y].ats++;else byYear[y].su++;
-      if(r.suResult==='WIN')byYear[y].suW++;
-      else if(r.suResult==='LOSE')byYear[y].suL++;
+      if(r.suResult==='WIN')byYear[y].suW++;else if(r.suResult==='LOSE')byYear[y].suL++;
     });
   });
   const tbody=document.getElementById('bf-results');
   if(!tbody) return;
   const rows=Object.entries(byYear).sort((a,b)=>a[0]-b[0]).map(([y,d])=>{
     const eff=d.W+d.L, pct=eff>0?((d.W/eff)*100).toFixed(1):0;
+    const bEff=d.bW+d.bL, bPct=bEff>0?((d.bW/bEff)*100).toFixed(1):0;
     const suEff=d.suW+d.suL, suPct=suEff>0?((d.suW/suEff)*100).toFixed(1):0;
-    const oeff=d.ouW+d.ouL, opct=oeff>0?((d.ouW/oeff)*100).toFixed(1):0;
     const pc=parseFloat(pct)>=56?'pct-hi':parseFloat(pct)>=50?'pct-mid':'pct-lo';
-    const suPc=parseFloat(suPct)>=56?'pct-hi':parseFloat(suPct)>=50?'pct-mid':'pct-lo';
-    const note=d.ats>0&&d.su>0?`${d.ats} ATS+${d.su} SU`:d.ats>0?'All ATS':'All SU';
+    const bPc=parseFloat(bPct)>=60?'pct-hi':parseFloat(bPct)>=54?'pct-mid':'pct-lo';
     return `<tr>
       <td style="color:var(--gold);font-family:'Bebas Neue',sans-serif">${y}</td>
       <td>${d.wks}</td><td>${d.W+d.L+d.P}</td>
-      <td class="wc">${d.W}</td><td class="lc">${d.L}</td><td class="pc">${d.P}</td>
+      <td class="wc" style="border-left:1px solid var(--line2)">${d.W}</td>
+      <td class="lc">${d.L}</td><td class="pc">${d.P}</td>
       <td class="${pc}" style="font-weight:700">${pct}%</td>
-      <td class="${suPc}">${suPct}%</td>
-      <td style="font-size:10px;color:var(--text3)">${note}</td>
-      <td class="wc">${d.ouW}</td><td class="lc">${d.ouL}</td>
-      <td>${opct}%</td></tr>`;
+      <td class="wc" style="border-left:1px solid var(--line2)">${d.bW}</td>
+      <td class="lc">${d.bL}</td>
+      <td style="color:var(--text3)">${bEff}</td>
+      <td class="${bPc}" style="font-weight:700">${bPct}%</td>
+      <td style="color:var(--text3)">${suPct}%</td>
+      <td style="font-size:10px;color:var(--text3)">${d.ats>0?'ATS':'SU'}</td>
+    </tr>`;
   });
-  tbody.innerHTML=rows.length?rows.join(''):'<tr><td colspan="12" style="color:var(--text3);text-align:center;padding:16px;font-family:\'DM Mono\',monospace">No backfill data yet.</td></tr>';
+
+  // Totals row
+  const totW=Object.values(byYear).reduce((s,d)=>s+d.W,0);
+  const totL=Object.values(byYear).reduce((s,d)=>s+d.L,0);
+  const totBW=Object.values(byYear).reduce((s,d)=>s+d.bW,0);
+  const totBL=Object.values(byYear).reduce((s,d)=>s+d.bL,0);
+  const totPct=totW+totL>0?((totW/(totW+totL))*100).toFixed(1):0;
+  const totBPct=totBW+totBL>0?((totBW/(totBW+totBL))*100).toFixed(1):0;
+  const totRow=`<tr style="border-top:2px solid var(--border2);font-weight:700">
+    <td style="color:var(--gold2);font-family:'Bebas Neue',sans-serif">TOTAL</td>
+    <td>—</td><td>${totW+totL}</td>
+    <td class="wc" style="border-left:1px solid var(--line2)">${totW}</td>
+    <td class="lc">${totL}</td><td>—</td>
+    <td style="color:${parseFloat(totPct)>=56?'var(--green)':'var(--yellow)'};font-weight:700">${totPct}%</td>
+    <td class="wc" style="border-left:1px solid var(--line2)">${totBW}</td>
+    <td class="lc">${totBL}</td>
+    <td style="color:var(--text3)">${totBW+totBL}</td>
+    <td style="color:${parseFloat(totBPct)>=60?'var(--green)':'var(--yellow)'};font-weight:700">${totBPct}%</td>
+    <td>—</td><td>—</td>
+  </tr>`;
+
+  tbody.innerHTML=rows.length?rows.join('')+totRow:'<tr><td colspan="13" style="color:var(--text3);text-align:center;padding:16px">No backfill data yet.</td></tr>';
 }
 
 // =====================================================================
