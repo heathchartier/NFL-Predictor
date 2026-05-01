@@ -944,12 +944,19 @@ async function fetchWeek() {
       // Store last rest days estimate on home team
       const homeLastRestDays = isHomeOffBye ? 14 : isHomeShortWeek ? 4 : 7;
 
+      // homeFav: true = home is favored (negative spread), false = visitor is favored (positive spread)
+      // Auto-detect from ESPN spread if available
+      const homeFavInit = spread === null ? true : spread <= 0;
+
       games.push({
         id: Date.now()+Math.random(), espnId: ev.id,
         week: curWeek, year: curYear, autoFetched: true,
         gameDate: ev.date, dayOfWeek, isThursday,
         isDivisional: sameDivision(hd.team.abbreviation, vd.team.abbreviation),
         isHomeOffBye, isHomeShortWeek,
+        homeFav: homeFavInit,
+        homeSpread: spread !== null ? spread : null,           // home team's spread (neg = home fav)
+        visSpread:  spread !== null ? -spread : null,          // visitor's spread (mirror)
         blendLabel: isEarlyBlend ? blendLabel : null,
         home: {
           team: hd.team.abbreviation, fullName: hd.team.displayName,
@@ -1291,6 +1298,34 @@ function updTop(id, field, val) {
 }
 function removeGame(id) { games=games.filter(g=>g.id!==id); persist(); renderGames(); }
 
+function updateSpreadFromTeam(id, side, val) {
+  const g = games.find(g => g.id === id);
+  if (!g) return;
+  const n = parseFloat(val);
+  if (val === '' || val === null || isNaN(n)) {
+    g.spread = null;
+    g.homeSpread = null;
+    g.visSpread = null;
+  } else {
+    // Vegas convention: negative = this team is favored
+    // Home spread and visitor spread are mirror images: if home=-3 then vis=+3
+    if (side === 'home') {
+      g.homeSpread = n;
+      g.visSpread = -n;
+      g.spread = n; // internal: negative = home favored, positive = visitor favored
+    } else {
+      g.visSpread = n;
+      g.homeSpread = -n;
+      g.spread = -n; // flip: visitor spread negative means visitor is fav = positive home spread
+    }
+    // Sync the other input
+    const otherId = side === 'home' ? `sp-vis-${id}` : `sp-home-${id}`;
+    const otherEl = document.getElementById(otherId);
+    if (otherEl) otherEl.value = side === 'home' ? -n : -n;
+  }
+  g.calc = null; persist(); calcAll();
+}
+
 // =====================================================================
 // RENDER GAMES
 // =====================================================================
@@ -1318,7 +1353,11 @@ function gameCard(g) {
   const rankClass = !rank ? 'r-lo' : pct >= 0.875 ? 'r16' : pct >= 0.625 ? 'r-hi' : pct >= 0.375 ? 'r-mid' : 'r-lo';
   const dcClass = !c?.spreadDiff ? '' : c.spreadDiff >= 7 ? 'diff-0' : c.spreadDiff >= 3 ? 'diff-1' : 'diff-2';
   const spVal = g.spread !== null && g.spread !== '' ? parseFloat(g.spread) : null;
-  const spLabel = spVal === null ? '—' : spVal < 0 ? `${g.visitor.team} -${Math.abs(spVal).toFixed(1)}` : spVal > 0 ? `${g.home.team} -${spVal.toFixed(1)}` : "Pick'em";
+  // spLabel: show the favorite team with their negative number
+  const favTeam = spVal === null ? null : spVal < 0 ? g.home.team : spVal > 0 ? g.visitor.team : null;
+  const spLabel = spVal === null ? '—' :
+    spVal < 0 ? `${g.home.team} ${spVal.toFixed(1)}` :
+    spVal > 0 ? `${g.visitor.team} -${spVal.toFixed(1)}` : "Pick'em";
 
   const alerts = c?.alerts || [];
 
@@ -1376,8 +1415,23 @@ function gameCard(g) {
       <div class="tgrid">${teamBlock(g,'home')}${teamBlock(g,'visitor')}</div>
       <div class="gc-bottom">
         <div class="sg"><label>Spread <span class="stag st-m">your book</span></label>
-          <div style="display:flex;align-items:center;gap:8px">
-            <input type="number" value="${g.spread??''}" step="0.5" placeholder="e.g. -3" onchange="updTop(${g.id},'spread',this.value)" style="width:80px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:11px;color:var(--blue2);font-family:'DM Mono',monospace;width:32px;text-align:right">${g.home.team}</span>
+                <input type="number" id="sp-home-${g.id}" value="${g.homeSpread??''}"
+                  step="0.5" placeholder="e.g. -3"
+                  onchange="updateSpreadFromTeam(${g.id},'home',this.value)"
+                  style="width:72px" title="Enter home team's spread (negative if home is favored)">
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:11px;color:var(--purple);font-family:'DM Mono',monospace;width:32px;text-align:right">${g.visitor.team}</span>
+                <input type="number" id="sp-vis-${g.id}" value="${g.visSpread??''}"
+                  step="0.5" placeholder="e.g. +3"
+                  onchange="updateSpreadFromTeam(${g.id},'vis',this.value)"
+                  style="width:72px" title="Enter visitor team's spread (negative if visitor is favored)">
+              </div>
+            </div>
             <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">${spLabel}</span>
           </div>
         </div>
