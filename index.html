@@ -312,7 +312,10 @@ button:disabled{opacity:.4;cursor:not-allowed}
 <!-- ===== RESULTS ===== -->
 <div id="tab-results" class="page">
   <div class="sec-title">Enter Actual Results — Week <span id="res-wk">—</span></div>
-  <div class="info">Enter final scores after games are played to track your record.</div>
+  <div class="info">Enter final scores after games are played to track your record.
+    <button class="btn-blue btn-sm" onclick="fetchFinalScores()" style="margin-left:12px">↓ Fetch Final Scores</button>
+    <span id="fetch-scores-status" style="margin-left:8px;font-size:11px;color:var(--text3)"></span>
+  </div>
   <div id="res-form"><div class="empty"><strong>No Games Yet</strong>Fetch and calculate games first.</div></div>
 </div>
 
@@ -429,35 +432,69 @@ button:disabled{opacity:.4;cursor:not-allowed}
   <div class="howto-card">
     <h3>Step 4 — Enter Results</h3>
     <ul>
-      <li>After games, go to <strong>Enter Results</strong>, add final scores, save</li>
-      <li>Win% tracks overall and by confidence tier (1–5, 6–10, 11–16)</li>
+      <li>After games, go to <strong>Enter Results</strong> — click <strong>↓ Fetch Final Scores</strong> to auto-fill actual scores from completed games</li>
+      <li>Or enter scores manually if needed, then click Save</li>
+      <li>Win% tracks overall and by confidence tier</li>
+    </ul>
+  </div>
+  <div class="howto-card">
+    <h3>🏷 Symbol & Badge Key</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;font-size:12px;font-family:'DM Mono',monospace">
+      <div><span style="color:#00ff88">🔥 ELITE BET</span> — Spread diff 13+ pts (86.6% ATS historically)</div>
+      <div><span style="color:#44dd66">★ STRONG BET</span> — Spread diff 9-13 pts (75.2% ATS)</div>
+      <div><span style="color:#44bb88">✓ GOOD BET</span> — Spread diff 6-9 pts (66.4% ATS)</div>
+      <div><span style="color:var(--gold)">★ TIER 1 PREMIUM</span> — Home off bye OR home Thursday (72.4% ATS)</div>
+      <div style="color:var(--text2)">TIER 2 — All other betable picks (64.9% ATS)</div>
+      <div style="color:var(--text3)">TIER 3 INFO — Non-betable, informational only</div>
+      <div><span style="color:#aaaa00">⚠ TIGHT LINE</span> — Spread under 3.5 (near coin flip, skip)</div>
+      <div><span style="color:#cc4444">⚠ DEAD ZONE</span> — Est. margin 6-12 pts (41-52% ATS, skip)</div>
+      <div><span style="color:#cc8800">⚠ WEAK HOME EDGE</span> — Home pick but edge vs spread &lt;4.0 pts</div>
+      <div><span style="color:#aa66cc">⚠ LATE VIS</span> — Wk 15-18 visitor pick (49.4% ATS historically)</div>
+      <div><span style="color:var(--dog-col)">🐕 DOG</span> — Formula is picking the underdog</div>
+      <div><span style="color:var(--green)">HOME OFF BYE</span> — Home team coming off bye week</div>
+      <div><span style="color:var(--gold)">THURSDAY</span> — Thursday night game (short week for home)</div>
+      <div><span style="color:var(--yellow)">DIV</span> — Divisional matchup</div>
+      <div><span style="color:var(--auto-t)">AUTO</span> — Stats auto-fetched from data source</div>
+      <div><span style="color:var(--manual-t)">⚗ BLENDED</span> — Early season blended stats (wks 1-3)</div>
+      <div><span style="color:var(--blue2)">OVER</span> / <span style="color:var(--red)">UNDER</span> — Estimated total vs O/U line (informational only)</div>
+      <div><span style="color:var(--text3)">Rank 16</span> = most confident · <span style="color:var(--text3)">Rank 1</span> = least confident</div>
+    </div>
+  </div>
+  <div class="howto-card">
+    <h3>📊 Spread Input Convention</h3>
+    <ul>
+      <li>Enter spreads exactly as Vegas shows them — <strong>negative number = that team is the favorite</strong></li>
+      <li>Home team row: enter home spread (e.g. <strong>-3</strong> if home is favored by 3)</li>
+      <li>Visitor team row: auto-fills the mirror (+3), or enter directly if that's what your book shows</li>
+      <li>Example: KC home vs BUF, KC favored by 7 → enter <strong>-7</strong> in the KC row</li>
+      <li>Example: BUF is the road favorite by 3 → enter <strong>-3</strong> in the BUF visitor row</li>
     </ul>
   </div>
   <div class="howto-card">
     <h3>Early Season Stat Blending</h3>
     <ul>
-      <li><strong>Week 1:</strong> 70% prior season final stats + 30% preseason stats — no current season data exists yet</li>
-      <li><strong>Week 2:</strong> 60% prior + 20% preseason + 20% current (1 game of real data)</li>
-      <li><strong>Week 3:</strong> 40% prior + 10% preseason + 50% current (2 games of real data)</li>
+      <li><strong>Week 1:</strong> 70% prior season final stats + 30% preseason stats</li>
+      <li><strong>Week 2:</strong> 60% prior + 20% preseason + 20% current</li>
+      <li><strong>Week 3:</strong> 40% prior + 10% preseason + 50% current</li>
       <li><strong>Week 4+:</strong> 100% current season stats only</li>
-      <li>All blending happens automatically in the background. A ⚗ badge appears on blended games.</li>
-      <li>Hover the ⚗ icon on any team to see the exact blend breakdown applied.</li>
-      <li>These weights are our starting point — deep analysis will tell us if different ratios work better.</li>
     </ul>
   </div>
+  <div class="howto-card">
+    <h3>Formula</h3>
     <ul>
       <li>If home PF avg > vis PA avg: home_base = (h_pf - h_pf/v_pa) / 2</li>
       <li>If home PF avg &lt; vis PA avg: home_base = h_pf + v_pa/h_pf</li>
       <li>If home PA avg > vis PF avg: vis_base = v_pf + h_pa/v_pf</li>
       <li>If home PA avg &lt; vis PF avg: vis_base = (v_pf - v_pf/h_pa) / 2</li>
       <li>Each team's pass/rush rank vs opponent's pass/rush def rank → ±1/2/3 pts</li>
-      <li>Spread diff = |estimated spread − Vegas line| → <strong>larger diff = higher confidence rank</strong> (your model disagrees more with the market)</li>
+      <li>Home field advantage: +1.5 pts (data-validated, reduced from 3.0)</li>
+      <li>Spread diff = |estimated spread − Vegas line| → larger diff = higher rank = more confident</li>
     </ul>
   </div>
   <div class="howto-card">
     <h3>Key Numbers (Most Common NFL Margins)</h3>
     <p style="margin-top:6px">3 · 7 · 6 · 14 · 10 · 5 · 8 · 4 · 1 · 2 · 17<br>
-    <span style="color:var(--text3);font-size:11px">Note: 6 and 4 are becoming more frequent with increased 4th-down attempts and 2-pt conversions. Verify current distributions in deep analysis phase.</span></p>
+    <span style="color:var(--text3);font-size:11px">6 and 4 becoming more frequent with increased 4th-down attempts and 2-pt conversions.</span></p>
   </div>
 </div>
 
@@ -1536,6 +1573,59 @@ function renderRanked() {
 // =====================================================================
 // RESULTS
 // =====================================================================
+async function fetchFinalScores() {
+  const {year, week} = curYear_wk();
+  const statusEl = document.getElementById('fetch-scores-status');
+  if (statusEl) statusEl.textContent = 'Fetching scores...';
+
+  try {
+    const url = `${ESPN_SB}?dates=${year}&seasontype=2&week=${week}&limit=25`;
+    const data = await apiFetch(url);
+    const events = data.events || [];
+    let filled = 0, notReady = 0;
+
+    for (const ev of events) {
+      const comp = ev.competitions?.[0];
+      if (!comp?.status?.type?.completed) { notReady++; continue; }
+
+      const hd = comp.competitors?.find(c => c.homeAway === 'home');
+      const vd = comp.competitors?.find(c => c.homeAway === 'away');
+      if (!hd || !vd) continue;
+
+      const hs = parseFloat(hd.score);
+      const vs = parseFloat(vd.score);
+      if (isNaN(hs) || isNaN(vs)) continue;
+
+      // Match to our game by team abbreviations
+      const g = wkGames().find(g =>
+        g.home.team === hd.team.abbreviation &&
+        g.visitor.team === vd.team.abbreviation
+      );
+      if (!g) continue;
+
+      // Fill in the score inputs on the results form
+      const hEl = document.getElementById(`rh_${g.id}`);
+      const vEl = document.getElementById(`rv_${g.id}`);
+      if (hEl) hEl.value = Math.round(hs);
+      if (vEl) vEl.value = Math.round(vs);
+      filled++;
+    }
+
+    if (statusEl) {
+      if (filled > 0 && notReady > 0)
+        statusEl.textContent = `✓ ${filled} scores filled · ${notReady} games not yet final`;
+      else if (filled > 0)
+        statusEl.textContent = `✓ All ${filled} scores filled — click Save to record`;
+      else if (notReady > 0)
+        statusEl.textContent = `Games not final yet — try again after they complete`;
+      else
+        statusEl.textContent = 'No matching games found';
+    }
+  } catch(e) {
+    if (statusEl) statusEl.textContent = `Error: ${e.message}`;
+  }
+}
+
 function renderResultsForm() {
   const {year, week} = curYear_wk();
   document.getElementById('res-wk').textContent = `${week} — ${year}`;
