@@ -818,7 +818,7 @@ async function fetchTeamPA(abbr, year, gamesPlayed) {
       // Cache each week's scoreboard so all 32 teams share the same fetch
       const sbKey = `${year}_w${wk}`;
       if (!scoreboardCache[sbKey]) {
-        const url = `${ESPN_SB}?dates=${year}&seasontype=2&week=${wk}&limit=25`;
+        const url = `${ESPN_SB}?season=${year}&seasontype=2&week=${wk}&limit=25`;
         const data = await apiFetch(url);
         scoreboardCache[sbKey] = data.events || [];
         await sleep(40);
@@ -850,9 +850,20 @@ async function fetchWeek() {
   setStatus('fstatus', `Fetching Week ${curWeek} schedule...`, 's-load');
 
   try {
-    const url = `${ESPN_SB}?dates=${curYear}&seasontype=2&week=${curWeek}&limit=25`;
+    // ESPN scoreboard: use season parameter for year, not dates
+    // The 'dates' param can cause wrong season results for early calendar year games
+    // seasontype=2 is regular season, week= is the NFL week number
+    const url = `${ESPN_SB}?season=${curYear}&seasontype=2&week=${curWeek}&limit=25`;
     const data = await apiFetch(url);
-    const events = data.events || [];
+    let events = data.events || [];
+
+    // Fallback to dates param if season param returns nothing
+    if (!events.length) {
+      const url2 = `${ESPN_SB}?dates=${curYear}&seasontype=2&week=${curWeek}&limit=25`;
+      const data2 = await apiFetch(url2);
+      events = data2.events || [];
+    }
+
     if (!events.length) {
       setStatus('fstatus', `No games found for ${curYear} Week ${curWeek}.`, 's-err');
       setDot('err'); btn.disabled = false; return;
@@ -1746,7 +1757,7 @@ async function backfillYear(yr) {
     }
 
     try {
-      const url = `${ESPN_SB}?dates=${yr}&seasontype=2&week=${wk}&limit=25`;
+      const url = `${ESPN_SB}?season=${yr}&seasontype=2&week=${wk}&limit=25`;
       const data = await apiFetch(url);
       const events = data.events || [];
       if (!events.length) { await sleep(100); continue; }
