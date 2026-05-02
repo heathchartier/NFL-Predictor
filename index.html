@@ -178,6 +178,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .pfill{height:100%;border-radius:2px;transition:width .6s ease}
 .pfill-g{background:linear-gradient(90deg,var(--green2),var(--green))}
 .pfill-b{background:linear-gradient(90deg,var(--blue),var(--blue2))}
+.pfill-r{background:linear-gradient(90deg,var(--red2),var(--red))}
 
 /* === TIER CARDS === */
 .tier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
@@ -264,6 +265,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
       <div class="hdr-stat"><div class="n" id="h-pct">—</div><div class="l">All-Time %</div></div>
       <div class="hdr-stat"><div class="n" id="h-w" style="color:var(--green)">0</div><div class="l">Wins</div></div>
       <div class="hdr-stat"><div class="n" id="h-l" style="color:var(--red)">0</div><div class="l">Losses</div></div>
+      <div class="hdr-stat"><div class="n" id="h-pnl">—</div><div class="l">P&L</div></div>
       <div class="hdr-stat"><div class="n" id="h-wks">0</div><div class="l">Weeks</div></div>
     </div>
     <div class="api-status"><div class="dot" id="api-dot"></div><span id="api-txt">Auto Stats</span></div>
@@ -355,6 +357,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
   <div class="scroll">
   <table class="htable">
     <thead><tr><th>Year</th><th>Wk</th><th>Games</th><th>W</th><th>L</th><th>Push</th><th>Win%</th>
+      <th>P&L</th><th>ROI</th>
       <th>Tier 1-5</th><th>Tier 6-10</th><th>Tier 11-16</th><th>Source</th></tr></thead>
     <tbody id="hist-body"></tbody>
   </table>
@@ -458,7 +461,8 @@ button:disabled{opacity:.4;cursor:not-allowed}
     <ul>
       <li>After games, go to <strong>Enter Results</strong> — click <strong>↓ Fetch Final Scores</strong> to auto-fill actual scores from completed games</li>
       <li>Or enter scores manually if needed, then click Save</li>
-      <li>Win% tracks overall and by confidence tier</li>
+      <li><strong>Optional:</strong> Enter wager amount ($) for each pick to track P&L and ROI — uses standard -110 odds (risk $110 to win $100)</li>
+      <li>Win% tracks overall and by confidence tier, P&L and ROI tracked in header and Win/Loss Record tab</li>
     </ul>
   </div>
   <div class="howto-card">
@@ -1680,6 +1684,8 @@ function renderResultsForm() {
           <input type="number" id="rh_${g.id}" value="${r.hScore??''}" placeholder="0" style="width:80px"></div>
         <div class="cg"><label>${g.visitor.team} Score</label>
           <input type="number" id="rv_${g.id}" value="${r.vScore??''}" placeholder="0" style="width:80px"></div>
+        <div class="cg"><label>Wager ($)</label>
+          <input type="number" id="wg_${g.id}" value="${r.wager??''}" placeholder="100" style="width:80px" step="10"></div>
       </div>
     </div>`;
   }).join('') + `<button class="btn-gold" onclick="saveResults()" style="margin-top:12px">✓ Save All Results</button>`;
@@ -1693,16 +1699,24 @@ function saveResults() {
   gs.forEach(g => {
     const hs = parseFloat(document.getElementById(`rh_${g.id}`)?.value);
     const vs = parseFloat(document.getElementById(`rv_${g.id}`)?.value);
+    const wager = parseFloat(document.getElementById(`wg_${g.id}`)?.value);
     if (!isNaN(hs) && !isNaN(vs)) {
       const c = g.calc;
       const actualSpread = hs - vs;
       const sp = g.spread !== null ? parseFloat(g.spread) : null;
-      let pickResult = 'N/A';
+      let pickResult = 'N/A', pnl = 0;
       if (sp !== null) {
         const diff = actualSpread - sp;
         if (Math.abs(diff) < 0.1) pickResult = 'PUSH';
         else if ((c.pickSide==='HOME' && actualSpread > sp)||(c.pickSide==='VISITOR' && actualSpread < sp)) pickResult = 'COVER';
         else pickResult = 'LOSE';
+        
+        // Calculate P&L: standard -110 odds (risk 110 to win 100)
+        if (!isNaN(wager) && wager > 0) {
+          if (pickResult === 'COVER') pnl = wager * (100/110); // Win: profit is wager * (100/110)
+          else if (pickResult === 'LOSE') pnl = -wager; // Lose: lose full wager
+          // PUSH: pnl stays 0
+        }
       }
       let ouResult = null;
       if (g.ou !== null) {
@@ -1710,7 +1724,11 @@ function saveResults() {
         const line = parseFloat(g.ou);
         ouResult = Math.abs(tot-line)<0.1?'PUSH':tot>line?'WIN':'LOSE';
       }
-      history[wk].games[g.id] = {hScore:hs,vScore:vs,pickResult,ouResult,rank:c.rank,isDog:c.isDog};
+      history[wk].games[g.id] = {
+        hScore:hs, vScore:vs, pickResult, ouResult, rank:c.rank, isDog:c.isDog,
+        wager: !isNaN(wager) && wager > 0 ? wager : null,
+        pnl: !isNaN(wager) && wager > 0 ? pnl : null
+      };
     }
   });
   persist(); renderRecord(); renderResultsForm(); updateHeader();
@@ -1721,7 +1739,7 @@ function saveResults() {
 // RECORD
 // =====================================================================
 function calcTotals(src) {
-  let W=0,L=0,P=0,ouW=0,ouL=0,ouP=0,wks=0;
+  let W=0,L=0,P=0,ouW=0,ouL=0,ouP=0,wks=0,totalPnL=0,totalWagered=0;
   const tierData = {'1-5':{W:0,L:0},'6-10':{W:0,L:0},'11-16':{W:0,L:0}};
   Object.values(history).forEach(wd => {
     if (!wd.games||!Object.keys(wd.games).length) return;
@@ -1739,19 +1757,25 @@ function calcTotals(src) {
       const tier = rk<=5?'1-5':rk<=10?'6-10':'11-16';
       if (r.pickResult==='COVER') tierData[tier].W++;
       else if (r.pickResult==='LOSE') tierData[tier].L++;
+      // P&L tracking
+      if (r.pnl !== null && r.pnl !== undefined) totalPnL += r.pnl;
+      if (r.wager !== null && r.wager !== undefined && r.pickResult !== 'PUSH') totalWagered += r.wager;
     });
   });
-  return {W,L,P,ouW,ouL,ouP,wks,tierData};
+  return {W,L,P,ouW,ouL,ouP,wks,tierData,totalPnL,totalWagered};
 }
 
 function updateHeader() {
   // All-time record
-  const {W,L,P,wks} = calcTotals();
+  const {W,L,P,wks,totalPnL,totalWagered} = calcTotals();
   const eff = W+L, pct = eff>0?((W/eff)*100).toFixed(1):'—';
+  const pnlColor = totalPnL > 0 ? 'var(--green)' : totalPnL < 0 ? 'var(--red)' : 'var(--gold2)';
   document.getElementById('h-pct').textContent = eff>0?pct+'%':'—';
   document.getElementById('h-w').textContent = W;
   document.getElementById('h-l').textContent = L;
   document.getElementById('h-wks').textContent = wks;
+  document.getElementById('h-pnl').textContent = totalWagered > 0 ? (totalPnL >= 0 ? '+$' : '-$') + Math.abs(totalPnL).toFixed(0) : '—';
+  document.getElementById('h-pnl').style.color = pnlColor;
 
   // Current season — find the most recent season that has manual entries
   // (manual = entries you made yourself this season, not backfill)
@@ -1797,10 +1821,12 @@ function updateHeader() {
 }
 
 function renderRecord() {
-  const {W,L,P,ouW,ouL,ouP,wks,tierData} = calcTotals();
+  const {W,L,P,ouW,ouL,ouP,wks,tierData,totalPnL,totalWagered} = calcTotals();
   const eff=W+L, pct=eff>0?((W/eff)*100).toFixed(1):0;
   const ouEff=ouW+ouL, opct=ouEff>0?((ouW/ouEff)*100).toFixed(1):0;
   const pctCol = pct>=56?'var(--green)':pct>=52?'var(--gold2)':pct>=48?'var(--text)':'var(--red)';
+  const roi = totalWagered > 0 ? ((totalPnL/totalWagered)*100).toFixed(1) : 0;
+  const roiCol = totalPnL > 0 ? 'var(--green)' : totalPnL < 0 ? 'var(--red)' : 'var(--text)';
 
   document.getElementById('rec-cards').innerHTML = `
     <div class="scard"><div class="sl">Win %</div><div class="sv" style="color:${pctCol}">${pct}%</div>
@@ -1809,6 +1835,10 @@ function renderRecord() {
     <div class="scard"><div class="sl">Total Picks</div><div class="sv">${W+L+P}</div></div>
     <div class="scard"><div class="sl">Wins</div><div class="sv" style="color:var(--green)">${W}</div></div>
     <div class="scard"><div class="sl">Losses</div><div class="sv" style="color:var(--red)">${L}</div></div>
+    <div class="scard"><div class="sl">Total P&L</div><div class="sv" style="color:${roiCol}">${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(0)}</div>
+      <div class="ss">$${totalWagered.toFixed(0)} wagered</div></div>
+    <div class="scard"><div class="sl">ROI</div><div class="sv" style="color:${roiCol}">${roi >= 0 ? '+' : ''}${roi}%</div>
+      <div class="pbar"><div class="pfill ${totalPnL>=0?'pfill-g':'pfill-r'}" style="width:${Math.min(Math.abs(roi),100)}%"></div></div></div>
     <div class="scard"><div class="sl">O/U Win %</div><div class="sv">${opct}%</div>
       <div class="pbar"><div class="pfill pfill-b" style="width:${opct}%"></div></div>
       <div class="ss">${ouW}W / ${ouL}L / ${ouP}P</div></div>
@@ -1836,18 +1866,25 @@ function renderRecord() {
   const rows = [];
   Object.entries(history).sort((a,b)=>a[0]>b[0]?1:-1).forEach(([wk,wd]) => {
     if (!wd.games) return;
-    let W2=0,L2=0,P2=0,oW=0,oL=0,oP=0;
+    let W2=0,L2=0,P2=0,oW=0,oL=0,oP=0,wkPnL=0,wkWagered=0;
     const t1={W:0,L:0},t2={W:0,L:0},t3={W:0,L:0};
     Object.values(wd.games).forEach(r => {
       if(r.pickResult==='COVER')W2++;else if(r.pickResult==='LOSE')L2++;else if(r.pickResult==='PUSH')P2++;
       if(r.ouResult==='WIN')oW++;else if(r.ouResult==='LOSE')oL++;else if(r.ouResult==='PUSH')oP++;
       const rk=r.rank||0,tier=rk<=5?t1:rk<=10?t2:t3;
       if(r.pickResult==='COVER')tier.W++;else if(r.pickResult==='LOSE')tier.L++;
+      // P&L for this week
+      if (r.pnl !== null && r.pnl !== undefined) wkPnL += r.pnl;
+      if (r.wager !== null && r.wager !== undefined && r.pickResult !== 'PUSH') wkWagered += r.wager;
     });
     const m=wd.meta||{};
     const tot=W2+L2+P2, pc=tot>0?((W2/Math.max(W2+L2,1))*100).toFixed(1):'-';
     const ot=oW+oL+oP, op=ot>0?((oW/Math.max(oW+oL,1))*100).toFixed(1):'-';
     const pcc=parseFloat(pc)>=56?'pct-hi':parseFloat(pc)>=50?'pct-mid':'pct-lo';
+    const wkROI = wkWagered > 0 ? ((wkPnL/wkWagered)*100).toFixed(1) : '-';
+    const pnlDisplay = wkWagered > 0 ? (wkPnL >= 0 ? '+' : '') + '$' + wkPnL.toFixed(0) : '-';
+    const pnlColor = wkPnL > 0 ? 'var(--green)' : wkPnL < 0 ? 'var(--red)' : 'var(--text3)';
+    const roiColor = parseFloat(wkROI) > 0 ? 'var(--green)' : parseFloat(wkROI) < 0 ? 'var(--red)' : 'var(--text3)';
     const t1p=t1.W+t1.L>0?((t1.W/(t1.W+t1.L))*100).toFixed(0)+`% (${t1.W}-${t1.L})`:'-';
     const t2p=t2.W+t2.L>0?((t2.W/(t2.W+t2.L))*100).toFixed(0)+`% (${t2.W}-${t2.L})`:'-';
     const t3p=t3.W+t3.L>0?((t3.W/(t3.W+t3.L))*100).toFixed(0)+`% (${t3.W}-${t3.L})`:'-';
@@ -1856,6 +1893,8 @@ function renderRecord() {
       <td>${m.week||wk}</td><td>${tot}</td>
       <td class="wc">${W2}</td><td class="lc">${L2}</td><td class="pc">${P2}</td>
       <td class="${pcc}">${pc}%</td>
+      <td style="color:${pnlColor};font-size:11px">${pnlDisplay}</td>
+      <td style="color:${roiColor};font-size:11px">${wkROI !== '-' ? (parseFloat(wkROI) >= 0 ? '+' : '') + wkROI + '%' : '-'}</td>
       <td style="color:var(--text3);font-size:11px">${t1p}</td>
       <td style="color:var(--text3);font-size:11px">${t2p}</td>
       <td style="color:${parseFloat(t3p)>=56?'var(--green)':'var(--text3)'};font-size:11px">${t3p}</td>
@@ -1863,26 +1902,29 @@ function renderRecord() {
     </tr>`);
   });
   document.getElementById('hist-body').innerHTML = rows.length?rows.join(''):
-    '<tr><td colspan="11" style="color:var(--text3);text-align:center;padding:20px;font-family:\'DM Mono\',monospace">No results recorded yet.</td></tr>';
+    '<tr><td colspan="13" style="color:var(--text3);text-align:center;padding:20px;font-family:\'DM Mono\',monospace">No results recorded yet.</td></tr>';
   updateHeader();
 }
 
 function exportCSV() {
-  let csv = 'Year,Week,Games,Wins,Losses,Pushes,WinPct,OUWins,OULosses,OUPct,Tier1-5,Tier6-10,Tier11-16,Source\n';
+  let csv = 'Year,Week,Games,Wins,Losses,Pushes,WinPct,P&L,ROI,Wagered,OUWins,OULosses,OUPct,Tier1-5,Tier6-10,Tier11-16,Source\n';
   Object.entries(history).sort().forEach(([wk,wd]) => {
     if (!wd.games) return;
-    let W=0,L=0,P=0,oW=0,oL=0,oP=0;
+    let W=0,L=0,P=0,oW=0,oL=0,oP=0,wkPnL=0,wkWagered=0;
     const t1={W:0,L:0},t2={W:0,L:0},t3={W:0,L:0};
     Object.values(wd.games).forEach(r => {
       if(r.pickResult==='COVER')W++;else if(r.pickResult==='LOSE')L++;else P++;
       if(r.ouResult==='WIN')oW++;else if(r.ouResult==='LOSE')oL++;else oP++;
       const rk=r.rank||0,t=rk<=5?t1:rk<=10?t2:t3;
       if(r.pickResult==='COVER')t.W++;else t.L++;
+      if (r.pnl !== null && r.pnl !== undefined) wkPnL += r.pnl;
+      if (r.wager !== null && r.wager !== undefined && r.pickResult !== 'PUSH') wkWagered += r.wager;
     });
     const m=wd.meta||{},tot=W+L+P,pc=tot>0?((W/Math.max(W+L,1))*100).toFixed(1):0;
     const op=oW+oL>0?((oW/(oW+oL))*100).toFixed(1):0;
+    const wkROI = wkWagered > 0 ? ((wkPnL/wkWagered)*100).toFixed(1) : '';
     const tp = t=>t.W+t.L>0?((t.W/(t.W+t.L))*100).toFixed(1)+'%':'-';
-    csv+=`${m.year||''},${m.week||''},${tot},${W},${L},${P},${pc},${oW},${oL},${op},${tp(t1)},${tp(t2)},${tp(t3)},${m.source||'manual'}\n`;
+    csv+=`${m.year||''},${m.week||''},${tot},${W},${L},${P},${pc},${wkPnL.toFixed(2)},${wkROI},${wkWagered.toFixed(2)},${oW},${oL},${op},${tp(t1)},${tp(t2)},${tp(t3)},${m.source||'manual'}\n`;
   });
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download=`nfl_predictor_history.csv`; a.click();
