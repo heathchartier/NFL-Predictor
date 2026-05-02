@@ -236,8 +236,32 @@ button:disabled{opacity:.4;cursor:not-allowed}
   </div>
   <div></div>
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <!-- Current Season Record - prominent display -->
+    <div style="background:linear-gradient(135deg,#0a1520,#0d1e30);border:1px solid var(--gold3);border-radius:8px;padding:8px 14px;display:flex;gap:0;align-items:stretch">
+      <div style="padding-right:12px;border-right:1px solid var(--line2);margin-right:12px">
+        <div style="font-size:9px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;font-family:'DM Mono',monospace">Current Season</div>
+        <div style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace" id="cs-season-label">—</div>
+      </div>
+      <div style="text-align:center;padding:0 10px;border-right:1px solid var(--line2)">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--gold2);line-height:1" id="cs-pct">—</div>
+        <div style="font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-top:2px;font-family:'DM Mono',monospace">ATS %</div>
+      </div>
+      <div style="text-align:center;padding:0 10px;border-right:1px solid var(--line2)">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--green);line-height:1" id="cs-w">0</div>
+        <div style="font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-top:2px;font-family:'DM Mono',monospace">W</div>
+      </div>
+      <div style="text-align:center;padding:0 10px;border-right:1px solid var(--line2)">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--red);line-height:1" id="cs-l">0</div>
+        <div style="font-size:9px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-top:2px;font-family:'DM Mono',monospace">L</div>
+      </div>
+      <div style="text-align:center;padding:0 0 0 10px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--gold);line-height:1" id="cs-t1">—</div>
+        <div style="font-size:9px;color:var(--gold3);letter-spacing:1px;text-transform:uppercase;margin-top:2px;font-family:'DM Mono',monospace">T1 %</div>
+      </div>
+    </div>
+    <!-- All-time record -->
     <div class="hdr-record">
-      <div class="hdr-stat"><div class="n" id="h-pct">—</div><div class="l">Win %</div></div>
+      <div class="hdr-stat"><div class="n" id="h-pct">—</div><div class="l">All-Time %</div></div>
       <div class="hdr-stat"><div class="n" id="h-w" style="color:var(--green)">0</div><div class="l">Wins</div></div>
       <div class="hdr-stat"><div class="n" id="h-l" style="color:var(--red)">0</div><div class="l">Losses</div></div>
       <div class="hdr-stat"><div class="n" id="h-wks">0</div><div class="l">Weeks</div></div>
@@ -1721,12 +1745,55 @@ function calcTotals(src) {
 }
 
 function updateHeader() {
+  // All-time record
   const {W,L,P,wks} = calcTotals();
   const eff = W+L, pct = eff>0?((W/eff)*100).toFixed(1):'—';
   document.getElementById('h-pct').textContent = eff>0?pct+'%':'—';
   document.getElementById('h-w').textContent = W;
   document.getElementById('h-l').textContent = L;
   document.getElementById('h-wks').textContent = wks;
+
+  // Current season — find the most recent season that has manual entries
+  // (manual = entries you made yourself this season, not backfill)
+  const manualEntries = Object.entries(history)
+    .filter(([,wd]) => wd.meta?.source === 'manual' && wd.meta?.year)
+    .sort((a,b) => b[0] > a[0] ? 1 : -1);
+
+  const currentYear = manualEntries.length > 0
+    ? Math.max(...manualEntries.map(([,wd]) => wd.meta.year))
+    : new Date().getFullYear();
+
+  const csEntries = Object.values(history).filter(wd =>
+    wd.meta?.year === currentYear && wd.meta?.source === 'manual'
+  );
+
+  let csW=0, csL=0, csT1W=0, csT1L=0;
+  csEntries.forEach(wd => {
+    Object.values(wd.games||{}).forEach(r => {
+      if(r.pickResult==='COVER') csW++;
+      else if(r.pickResult==='LOSE') csL++;
+      // Tier 1 = rank in top ~22% of games (ranks 12-16 range)
+      // Use isTier1 if stored, or fall back to high rank
+      const isT1 = r.isTier1 || (r.rank && r.rank >= 12);
+      if(isT1) {
+        if(r.pickResult==='COVER') csT1W++;
+        else if(r.pickResult==='LOSE') csT1L++;
+      }
+    });
+  });
+
+  const csEff=csW+csL;
+  const csPct=csEff>0?((csW/csEff)*100).toFixed(1):'—';
+  const csT1Eff=csT1W+csT1L;
+  const csT1Pct=csT1Eff>0?((csT1W/csT1Eff)*100).toFixed(0)+'%':'—';
+  const pctColor = parseFloat(csPct)>=66?'var(--green)':parseFloat(csPct)>=56?'var(--gold2)':parseFloat(csPct)>=50?'var(--text)':'var(--red)';
+
+  document.getElementById('cs-season-label').textContent = currentYear + ' Season';
+  document.getElementById('cs-pct').textContent = csEff>0?csPct+'%':'—';
+  document.getElementById('cs-pct').style.color = pctColor;
+  document.getElementById('cs-w').textContent = csW;
+  document.getElementById('cs-l').textContent = csL;
+  document.getElementById('cs-t1').textContent = csT1Pct;
 }
 
 function renderRecord() {
@@ -2016,10 +2083,17 @@ async function backfillYear(yr) {
         if(ouR==='WIN')ouW++;else if(ouR==='LOSE')ouL++;else if(ouR==='PUSH')ouP++;
         if(pr2!=='N/A') wkGamesData[ev.id]={
           hScore:hs, vScore:vs, pickResult:pr2, ouResult:ouR,
+          spreadDiff: c.spreadDiff,  // store for ranking after loop
           suResult, rank:null, isDog:c.isDog,
           hadSpread:spread!==null, isBetable
         };
       }
+
+      // Assign ranks within this week based on spreadDiff (largest=most confident=highest rank)
+      const rankable = Object.entries(wkGamesData)
+        .filter(([,g]) => g.spreadDiff !== null && g.spreadDiff !== undefined)
+        .sort((a,b) => (a[1].spreadDiff||0) - (b[1].spreadDiff||0)); // ascending = rank 1 first
+      rankable.forEach(([id,], i) => { wkGamesData[id].rank = i + 1; });
 
       if (Object.keys(wkGamesData).length) {
         history[wkKey] = { meta:{week:wk,year:yr,source:'backfill'}, games:wkGamesData };
