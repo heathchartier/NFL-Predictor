@@ -309,9 +309,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
     <div class="ctrl-row">
       <div class="cg"><label>Season</label>
         <select id="yr">
-          <option value="2025">2025</option><option value="2024">2024</option>
-          <option value="2023">2023</option><option value="2022">2022</option>
-          <option value="2021">2021</option><option value="2020">2020</option>
+          <!-- Years populated dynamically on load -->
         </select>
       </div>
       <div class="cg"><label>Week</label>
@@ -502,6 +500,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
       <div><span style="color:var(--gold)">★ TIER 1 PREMIUM</span> — Home off bye OR home Thursday (72.4% ATS)</div>
       <div style="color:var(--text2)">TIER 2 — All other betable picks (64.9% ATS)</div>
       <div style="color:var(--text3)">TIER 3 INFO — Non-betable, informational only</div>
+      <div><span style="color:#ff8844">⚠ WEEK 1</span> — Week 1 picks (20-45% ATS, limited data)</div>
       <div><span style="color:#aaaa00">⚠ TIGHT LINE</span> — Spread under 3.5 (near coin flip, skip)</div>
       <div><span style="color:#cc4444">⚠ DEAD ZONE</span> — Est. margin 6-12 pts (41-52% ATS, skip)</div>
       <div><span style="color:#cc8800">⚠ WEAK HOME EDGE</span> — Home pick but edge vs spread &lt;4.0 pts</div>
@@ -597,13 +596,34 @@ const paCache = {};        // key: `${abbr}_${year}` -> totalPA
 const scoreboardCache = {}; // key: `${year}_w${week}` -> events array
 
 // =====================================================================
+// POPULATE YEAR DROPDOWN
+// =====================================================================
+function populateYears() {
+  const currentYear = new Date().getFullYear();
+  const startYear = 2020; // Earliest year with data
+  const endYear = currentYear + 2; // Show 2 years into future
+  
+  const yearSelect = document.getElementById('yr');
+  yearSelect.innerHTML = ''; // Clear existing options
+  
+  // Add years from newest to oldest
+  for (let year = endYear; year >= startYear; year--) {
+    const option = document.createElement('option');
+    option.value = year;
+    option.textContent = year;
+    yearSelect.appendChild(option);
+  }
+}
+
+// =====================================================================
 // PERSISTENCE
 // =====================================================================
 function load() {
+  populateYears(); // Populate years first
   try {
     const d = JSON.parse(localStorage.getItem('nfl_p1') || '{}');
     games = d.games || []; history = d.history || {};
-    curYear = d.curYear || 2025; curWeek = d.curWeek || 1;
+    curYear = d.curYear || new Date().getFullYear(); curWeek = d.curWeek || 1;
     document.getElementById('yr').value = curYear;
     document.getElementById('wk').value = curWeek;
   } catch(e) {}
@@ -1213,11 +1233,13 @@ function calcGame(g) {
   // Late season visitor warning: wk 15-18 visitor picks hit only 49.4% ATS (87g sample)
   const lateSeasonVisitorWarn = g.week >= 15 && pickSide === 'VISITOR' &&
                                  !belowThreshold && !inDeadZone;
+  // Week 1 low confidence: historically 20-45% ATS vs 66.5% overall (sample from backfill data)
+  const isWeek1LowConfidence = g.week === 1;
 
   return { hScore, vScore, estSpread, estTotal, spreadDiff, ouDiff,
            pickSide, pickTeam, pickFull, ouPick, isDog, alerts,
            belowThreshold, noSpread, inDeadZone, estMargin,
-           homeEdge, weakHomeEdge, isTier1, isTier2, lateSeasonVisitorWarn };
+           homeEdge, weakHomeEdge, isTier1, isTier2, lateSeasonVisitorWarn, isWeek1LowConfidence };
 }
 
 // =====================================================================
@@ -1496,6 +1518,7 @@ function gameCard(g) {
         ${c?.isDog ? '<span class="badge b-dog">🐕 DOG</span>' : ''}
         ${c?.ouPick ? `<span class="badge ${c.ouPick==='OVER'?'b-over':'b-under'}">${c.ouPick}</span>` : ''}
         ${betZone}
+        ${c?.isWeek1LowConfidence ? '<span class="badge" style="background:#1a0a00;color:#ff8844;border:1px solid #553300" title="Week 1 picks historically underperform (20-45% vs 66.5% overall) due to limited current-season data.">⚠ WEEK 1</span>' : ''}
         ${c?.belowThreshold ? '<span class="badge" style="background:#1a1a00;color:#aaaa00;border:1px solid #444400" title="Spread under 3.5 — below optimal filter threshold.">⚠ TIGHT LINE</span>' : ''}
         ${c?.inDeadZone ? '<span class="badge" style="background:#1a0000;color:#cc4444;border:1px solid #550000" title="Est. margin 6-12 pts — 41-52% ATS historically. Avoid.">⚠ DEAD ZONE</span>' : ''}
         ${c?.weakHomeEdge ? '<span class="badge" style="background:#1a1000;color:#cc8800;border:1px solid #553300" title="Home pick edge vs spread < 4.0 pts — below asymmetric threshold.">⚠ WEAK HOME EDGE</span>' : ''}
@@ -1606,6 +1629,7 @@ function renderRanked() {
       <td style="font-weight:700;font-family:'DM Mono',monospace">
         ${g.home.team} vs ${g.visitor.team}
         ${c.isTier1?'<span style="font-size:9px;background:var(--gold);color:#000;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:700">★T1</span>':''}
+        ${c.isWeek1LowConfidence?'<span style="font-size:9px;color:#ff8844;margin-left:4px" title="Week 1: 20-45% ATS historically">⚠W1</span>':''}
         ${c.lateSeasonVisitorWarn?'<span style="font-size:9px;color:#aa66cc;margin-left:4px">⚠LV</span>':''}
       </td>
       <td><span class="badge ${c.pickSide==='HOME'?'b-home':'b-vis'}">${c.pickTeam}</span>
