@@ -1816,9 +1816,9 @@ function renderRecord() {
 
   // Tier cards
   const tierLabels = [
-    ['1-5', '★ Tier 1 PREMIUM', 'Home off bye OR Home Thursday — 72.4% ATS (352g validated)'],
-    ['6-10','Tier 2 Standard',   'All other betable picks — 64.9% ATS (1,268g validated)'],
-    ['11-16','Tier 3 Info',      'Non-betable: tight line, dead zone, weak home edge'],
+    ['1-5',  'Low Confidence',  'Rank 1-5 — weakest picks in the weekly batch'],
+    ['6-10', 'Mid Confidence',  'Rank 6-10 — middle-tier picks'],
+    ['11-16','High Confidence', 'Rank 11-16 — strongest picks (Tier 1 PREMIUM tagged separately)'],
   ];
   document.getElementById('tier-cards').innerHTML = tierLabels.map(([key,label,desc]) => {
     const t = tierData[key]; const te = t.W+t.L;
