@@ -211,6 +211,24 @@ button:disabled{opacity:.4;cursor:not-allowed}
 /* === RESULTS === */
 .res-block{background:var(--ink2);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:8px}
 
+/* === ACTION SHEET === */
+.action-picks{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.action-card{background:var(--ink2);border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;grid-template-columns:60px 1fr auto;gap:14px;align-items:center;transition:all .2s}
+.action-card:hover{border-color:var(--line2);background:var(--ink3)}
+.action-card.tier1{border:2px solid var(--gold);background:linear-gradient(135deg,rgba(212,168,67,.05),transparent)}
+.action-rank{font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1;text-align:center;min-width:50px}
+.action-rank.r16{color:var(--gold);text-shadow:0 0 20px rgba(212,168,67,.5)}
+.action-rank.r-hi{color:var(--gold2)}
+.action-rank.r-mid{color:var(--text2)}
+.action-rank.r-lo{color:var(--text3)}
+.action-main{display:flex;flex-direction:column;gap:6px}
+.action-matchup{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.5px;color:var(--text);display:flex;align-items:center;gap:8px}
+.action-matchup .vs{color:var(--text3);font-size:14px}
+.action-pick{font-size:12px;color:var(--text2);font-family:'DM Mono',monospace}
+.action-pick strong{color:var(--blue2);font-size:13px}
+.action-spread{font-size:11px;color:var(--text3)}
+.action-badges{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+
 /* === EMPTY STATE === */
 .empty{color:var(--text3);font-size:13px;padding:40px;text-align:center;border:1px dashed var(--line);border-radius:8px;margin-top:4px;font-family:'DM Mono',monospace;line-height:2}
 .empty strong{color:var(--gold);display:block;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;margin-bottom:8px}
@@ -276,6 +294,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 <!-- LOCAL FILE WARNING -->
 <div class="nav">
   <div class="nav-tab on" onclick="showTab('predictor',this)">Weekly Predictor</div>
+  <div class="nav-tab" onclick="showTab('action',this)">Action Sheet</div>
   <div class="nav-tab" onclick="showTab('results',this)">Enter Results</div>
   <div class="nav-tab" onclick="showTab('record',this)">Win / Loss Record</div>
   <div class="nav-tab" onclick="showTab('backfill',this)">Historical Backfill</div>
@@ -332,6 +351,15 @@ button:disabled{opacity:.4;cursor:not-allowed}
       <tbody id="ranked-body"></tbody>
     </table>
     </div>
+  </div>
+</div>
+
+<!-- ===== ACTION SHEET ===== -->
+<div id="tab-action" class="page">
+  <div class="sec-title">Action Sheet — Week <span id="action-wk">—</span></div>
+  <div class="info">Clean betting sheet showing only betable picks (spread ≥3.5, outside dead zone). Tier 1 Premium picks shown at top in gold.</div>
+  <div id="action-content">
+    <div class="empty"><strong>No Betable Picks Yet</strong>Calculate games first, then betable picks will appear here.</div>
   </div>
 </div>
 
@@ -579,7 +607,7 @@ function load() {
     document.getElementById('yr').value = curYear;
     document.getElementById('wk').value = curWeek;
   } catch(e) {}
-  renderGames(); renderRecord(); renderBfResults(); renderNotes();
+  renderGames(); renderRecord(); renderBfResults(); renderNotes(); renderActionSheet();
   updateHeader();
 }
 function persist() {
@@ -1325,7 +1353,7 @@ function calcAll() {
   // If some don't, user sees them ranked above the spread games
   // Either way total rank count = total calculated games
 
-  persist(); renderGames(); renderRanked(); renderResultsForm();
+  persist(); renderGames(); renderRanked(); renderResultsForm(); renderActionSheet();
 }
 
 // =====================================================================
@@ -1596,6 +1624,87 @@ function renderRanked() {
       <td>${(c.alerts||[]).map(a=>`<span class="alert-badge" title="${a.note}">⚡${a.t}</span>`).join(' ')}</td>
     </tr>`;
   }).join('');
+}
+
+// =====================================================================
+// ACTION SHEET
+// =====================================================================
+function renderActionSheet() {
+  const {year, week} = curYear_wk();
+  document.getElementById('action-wk').textContent = `${week} — ${year}`;
+  
+  const gs = wkGames().filter(g => g.calc);
+  const content = document.getElementById('action-content');
+  
+  if (!gs.length) {
+    content.innerHTML = '<div class="empty"><strong>No Calculated Games</strong>Fetch and calculate games first.</div>';
+    return;
+  }
+  
+  // Filter to betable picks only (spread >= 3.5, not in dead zone)
+  const betable = gs.filter(g => {
+    const c = g.calc;
+    return c && !c.belowThreshold && !c.inDeadZone && !c.weakHomeEdge;
+  });
+  
+  if (!betable.length) {
+    content.innerHTML = '<div class="empty"><strong>No Betable Picks This Week</strong>All games either below spread threshold, in dead zone, or have weak home edge.</div>';
+    return;
+  }
+  
+  // Sort: Tier 1 first, then by rank descending
+  const sorted = betable.sort((a,b) => {
+    if (a.calc.isTier1 && !b.calc.isTier1) return -1;
+    if (!a.calc.isTier1 && b.calc.isTier1) return 1;
+    return (b.calc.rank || 0) - (a.calc.rank || 0);
+  });
+  
+  const totalGames = gs.length || 16;
+  
+  content.innerHTML = '<div class="action-picks">' + sorted.map(g => {
+    const c = g.calc;
+    const rank = c.rank || 0;
+    const pct = rank / totalGames;
+    const rankClass = pct >= 0.875 ? 'r16' : pct >= 0.625 ? 'r-hi' : pct >= 0.375 ? 'r-mid' : 'r-lo';
+    
+    const spVal = g.spread !== null && g.spread !== '' ? parseFloat(g.spread) : null;
+    const spLabel = spVal === null ? '—' :
+      spVal < 0 ? `${g.home.team} ${spVal.toFixed(1)}` :
+      spVal > 0 ? `${g.visitor.team} -${spVal.toFixed(1)}` : "Pick'em";
+    
+    // Bet quality badge
+    let betBadge = '';
+    if (c.spreadDiff !== null && c.spreadDiff !== undefined) {
+      const sd = c.spreadDiff;
+      if (sd >= 13) betBadge = '<span class="badge" style="background:#0a2a0a;color:#00ff88;border:1px solid #1a6a2a;font-size:10px">🔥 ELITE</span>';
+      else if (sd >= 9) betBadge = '<span class="badge" style="background:#0a1f0a;color:#44dd66;border:1px solid #1a5a2a;font-size:10px">★ STRONG</span>';
+      else if (sd >= 6) betBadge = '<span class="badge" style="background:#0a1a14;color:#44bb88;border:1px solid #1a4a34;font-size:10px">✓ GOOD</span>';
+    }
+    
+    const tierBadge = c.isTier1 ? 
+      '<span class="badge" style="background:linear-gradient(135deg,var(--gold3),var(--gold));color:#000;font-size:10px;font-weight:700">★ TIER 1</span>' : '';
+    
+    const dogBadge = c.isDog ? '<span class="badge b-dog" style="font-size:10px">🐕 DOG</span>' : '';
+    
+    return `<div class="action-card ${c.isTier1 ? 'tier1' : ''}">
+      <div class="action-rank ${rankClass}">${rank}</div>
+      <div class="action-main">
+        <div class="action-matchup">
+          <span style="color:var(--blue2)">${g.home.team}</span>
+          <span class="vs">vs</span>
+          <span style="color:var(--purple)">${g.visitor.team}</span>
+        </div>
+        <div class="action-pick">
+          Pick: <strong>${c.pickTeam}</strong> ${dogBadge}
+        </div>
+        <div class="action-spread">Vegas Line: ${spLabel}</div>
+      </div>
+      <div class="action-badges">
+        ${tierBadge}
+        ${betBadge}
+      </div>
+    </div>`;
+  }).join('') + '</div>';
 }
 
 // =====================================================================
