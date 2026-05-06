@@ -275,6 +275,8 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .pick-card{background:var(--ink2);border:1px solid var(--line);border-radius:8px;padding:14px;transition:all .2s}
 .pick-card:hover{border-color:var(--gold3)}
 .pick-card.tier1{border-color:var(--gold);box-shadow:0 0 12px rgba(212,168,67,.15)}
+.pick-card.no-line{opacity:.6;border-color:var(--line2);border-style:dashed}
+.pick-card.no-line:hover{border-color:var(--line);opacity:.8}
 .pick-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .pick-rank{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--gold);line-height:1;min-width:40px}
 .pick-matchup{flex:1;padding:0 12px}
@@ -763,107 +765,61 @@ function getHistOdds(homeAbbr, visAbbr, year) {
   const k1 = `${year}_${homeAbbr}_${visAbbr}`;
   if (HIST_ODDS[k1]) {
     const g = HIST_ODDS[k1];
-    const spread = getSpreadWithFallback(g, true);
-    return {...g, sp: spread, homeIsHome: true, spreadSource: getSpreadSource(g, true)};
+    // CASCADING SPREAD LOOKUP for better coverage
+    let spread = g.sp; // Try primary spread field first
+    if (spread === null || spread === undefined) {
+      // Fallback 1: Home Line Close (most accurate closing line)
+      if (g.homeLineClose !== null && g.homeLineClose !== undefined) {
+        spread = g.homeLineClose;
+      }
+      // Fallback 2: Home Line Open (99.7% coverage)
+      else if (g.homeLineOpen !== null && g.homeLineOpen !== undefined) {
+        spread = g.homeLineOpen;
+      }
+      // Fallback 3: Away Line Close (invert for home perspective)
+      else if (g.awayLineClose !== null && g.awayLineClose !== undefined) {
+        spread = -g.awayLineClose;
+      }
+      // Fallback 4: Away Line Open (invert for home perspective)
+      else if (g.awayLineOpen !== null && g.awayLineOpen !== undefined) {
+        spread = -g.awayLineOpen;
+      }
+    }
+    return {...g, sp: spread, homeIsHome: true};
   }
+  
   // Try reversed (game stored with teams swapped)
   const k2 = `${year}_${visAbbr}_${homeAbbr}`;
   if (HIST_ODDS[k2]) {
     const g = HIST_ODDS[k2];
-    const spread = getSpreadWithFallback(g, false);
+    // CASCADING SPREAD LOOKUP for reversed game
+    let spread = g.sp; // Try primary spread field first
+    if (spread === null || spread === undefined) {
+      // When reversed, away becomes home, so check away lines first
+      // Fallback 1: Away Line Close (becomes home line when reversed)
+      if (g.awayLineClose !== null && g.awayLineClose !== undefined) {
+        spread = g.awayLineClose;
+      }
+      // Fallback 2: Away Line Open
+      else if (g.awayLineOpen !== null && g.awayLineOpen !== undefined) {
+        spread = g.awayLineOpen;
+      }
+      // Fallback 3: Home Line Close (invert since we're reversing)
+      else if (g.homeLineClose !== null && g.homeLineClose !== undefined) {
+        spread = -g.homeLineClose;
+      }
+      // Fallback 4: Home Line Open (invert since we're reversing)
+      else if (g.homeLineOpen !== null && g.homeLineOpen !== undefined) {
+        spread = -g.homeLineOpen;
+      }
+    }
+    // Flip spread since home/away is reversed
+    const finalSpread = spread !== null && spread !== undefined ? -spread : null;
     // Swap scores and flip spread since home/away is reversed
-    return {d:g.d, sp: spread, ou:g.ou,
-             hml:g.aml, aml:g.hml, hs:g.vs, vs:g.hs, pl:g.pl, homeIsHome:false,
-             spreadSource: getSpreadSource(g, false)};
+    return {d:g.d, sp: finalSpread, ou:g.ou,
+             hml:g.aml, aml:g.hml, hs:g.vs, vs:g.hs, pl:g.pl, homeIsHome:false};
   }
   return null;
-}
-
-// Cascading fallback for spread lookup
-// Priority: Home Line Close → Home Line Open → Away Line Close (inverted) → Away Line Open (inverted) → ESPN → NO LINE
-function getSpreadWithFallback(game, homeIsHome) {
-  // Helper to safely parse and validate spread values
-  const parseSpread = (val) => {
-    if (val === null || val === undefined || val === '') return null;
-    const num = parseFloat(val);
-    return isNaN(num) ? null : num;
-  };
-  
-  if (homeIsHome) {
-    // Game stored correctly: home team is actually home
-    // 1. Try Home Line Close
-    let spread = parseSpread(game['Home Line Close']);
-    if (spread !== null) return spread;
-    
-    // 2. Try Home Line Open
-    spread = parseSpread(game['Home Line Open']);
-    if (spread !== null) return spread;
-    
-    // 3. Try Away Line Close (invert sign)
-    spread = parseSpread(game['Away Line Close']);
-    if (spread !== null) return -spread;
-    
-    // 4. Try Away Line Open (invert sign)
-    spread = parseSpread(game['Away Line Open']);
-    if (spread !== null) return -spread;
-    
-    // 5. Try legacy 'sp' field (ESPN or other source)
-    spread = parseSpread(game.sp);
-    if (spread !== null) return spread;
-    
-    // 6. No line available
-    return null;
-  } else {
-    // Game stored reversed: home/away are swapped
-    // When reversed, Away lines become Home lines and vice versa
-    // 1. Try Away Line Close (this is actually the home team's line, so don't invert)
-    let spread = parseSpread(game['Away Line Close']);
-    if (spread !== null) return spread;
-    
-    // 2. Try Away Line Open
-    spread = parseSpread(game['Away Line Open']);
-    if (spread !== null) return spread;
-    
-    // 3. Try Home Line Close (invert because it's for the away team)
-    spread = parseSpread(game['Home Line Close']);
-    if (spread !== null) return -spread;
-    
-    // 4. Try Home Line Open (invert)
-    spread = parseSpread(game['Home Line Open']);
-    if (spread !== null) return -spread;
-    
-    // 5. Try legacy 'sp' field and invert
-    spread = parseSpread(game.sp);
-    if (spread !== null) return -spread;
-    
-    // 6. No line available
-    return null;
-  }
-}
-
-// Get the source of the spread for debugging/display purposes
-function getSpreadSource(game, homeIsHome) {
-  const parseSpread = (val) => {
-    if (val === null || val === undefined || val === '') return null;
-    const num = parseFloat(val);
-    return isNaN(num) ? null : num;
-  };
-  
-  if (homeIsHome) {
-    if (parseSpread(game['Home Line Close']) !== null) return 'Home Line Close';
-    if (parseSpread(game['Home Line Open']) !== null) return 'Home Line Open';
-    if (parseSpread(game['Away Line Close']) !== null) return 'Away Line Close (inverted)';
-    if (parseSpread(game['Away Line Open']) !== null) return 'Away Line Open (inverted)';
-    if (parseSpread(game.sp) !== null) return 'ESPN';
-    return 'NO LINE';
-  } else {
-    if (parseSpread(game['Away Line Close']) !== null) return 'Away Line Close';
-    if (parseSpread(game['Away Line Open']) !== null) return 'Away Line Open';
-    if (parseSpread(game['Home Line Close']) !== null) return 'Home Line Close (inverted)';
-    if (parseSpread(game['Home Line Open']) !== null) return 'Home Line Open (inverted)';
-    if (parseSpread(game.sp) !== null) return 'ESPN';
-    return 'NO LINE';
-  }
 }
 
 // Convert decimal odds to American moneyline
@@ -2672,10 +2628,6 @@ function openHistCard(weekKey) {
   const betableGames = [];
   
   Object.values(wd.games).forEach(r => {
-    if (r.pickResult === 'COVER') W++;
-    else if (r.pickResult === 'LOSE') L++;
-    else if (r.pickResult === 'PUSH') P++;
-    
     // Build game object for display
     const gameData = {
       rank: r.rank || 0,
@@ -2683,6 +2635,7 @@ function openHistCard(weekKey) {
       visitor: r.visitor || '—',
       pick: r.pick || '—',
       pickTeam: r.pickTeam || '—',
+      pickSide: r.pickSide || '—',
       spread: r.spread !== null && r.spread !== undefined ? r.spread : '—',
       estMargin: r.estMargin || 0,
       spreadDiff: r.spreadDiff || 0,
@@ -2693,9 +2646,18 @@ function openHistCard(weekKey) {
       vScore: r.vScore || 0
     };
     
+    // Only count in W/L record if game has a spread
+    const hasSpread = r.spread !== null && r.spread !== undefined;
+    
+    if (hasSpread) {
+      if (r.pickResult === 'COVER') W++;
+      else if (r.pickResult === 'LOSE') L++;
+      else if (r.pickResult === 'PUSH') P++;
+    }
+    
     allGames.push(gameData);
     
-    if (gameData.isBetable) {
+    if (gameData.isBetable && hasSpread) {
       betableGames.push(gameData);
       if (r.pickResult === 'COVER') betableW++;
       else if (r.pickResult === 'LOSE') betableL++;
@@ -2751,7 +2713,11 @@ function openHistCard(weekKey) {
 }
 
 function renderPickCard(game) {
+  // Check if game has no spread (NO LINE)
+  const hasNoLine = game.spread === null || game.spread === undefined || game.spread === '—';
+  
   const tier1Class = game.isTier1 ? 'tier1' : '';
+  const noLineClass = hasNoLine ? 'no-line' : '';
   const resultIcon = game.result === 'COVER' ? '✅' : game.result === 'LOSE' ? '❌' : game.result === 'PUSH' ? '⚖️' : '—';
   const resultColor = game.result === 'COVER' ? 'var(--green)' : game.result === 'LOSE' ? 'var(--red)' : 'var(--gold)';
   const spreadDisplay = typeof game.spread === 'number' ? game.spread.toFixed(1) : game.spread;
@@ -2766,6 +2732,41 @@ function renderPickCard(game) {
       const visSpread = -game.spread;
       pickDisplay = `${game.visitor} ${visSpread > 0 ? '+' : ''}${visSpread.toFixed(1)}`;
     }
+  }
+  
+  // If no line available, show special message
+  if (hasNoLine) {
+    return `
+      <div class="pick-card ${tier1Class} ${noLineClass}">
+        <div class="pick-header">
+          <div class="pick-rank">#${game.rank || 0}</div>
+          <div class="pick-matchup">
+            <div class="pick-teams">${game.home || '—'} vs ${game.visitor || '—'}</div>
+            <div class="pick-meta" style="color:var(--gold)">
+              ⚠️ NO LINE AVAILABLE - NOT BET
+            </div>
+          </div>
+          <div class="pick-prediction">
+            <div class="pick-team" style="color:var(--text2);font-size:13px;">Data unavailable</div>
+            <div class="pick-confidence" style="color:var(--text2)">NOT INCLUDED IN W/L</div>
+          </div>
+        </div>
+        <div class="pick-stats">
+          <div class="pick-stat">
+            <div class="pick-stat-label">Final Score</div>
+            <div class="pick-stat-value">${(game.hScore || 0).toFixed(0)}-${(game.vScore || 0).toFixed(0)}</div>
+          </div>
+          <div class="pick-stat">
+            <div class="pick-stat-label">Status</div>
+            <div class="pick-stat-value" style="color:var(--text2);font-size:12px;">Excluded</div>
+          </div>
+          <div class="pick-stat">
+            <div class="pick-stat-label">Reason</div>
+            <div class="pick-stat-value" style="color:var(--text2);font-size:12px;">No spread</div>
+          </div>
+        </div>
+      </div>
+    `;
   }
   
   return `
