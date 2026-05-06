@@ -761,16 +761,109 @@ const HIST_ODDS = {"2026_NE_SEA":{"d":"2026-02-08","sp":7.5,"ou":29.5,"hml":4.7,
 function getHistOdds(homeAbbr, visAbbr, year) {
   // Try exact match first
   const k1 = `${year}_${homeAbbr}_${visAbbr}`;
-  if (HIST_ODDS[k1]) return {...HIST_ODDS[k1], homeIsHome: true};
+  if (HIST_ODDS[k1]) {
+    const g = HIST_ODDS[k1];
+    const spread = getSpreadWithFallback(g, true);
+    return {...g, sp: spread, homeIsHome: true, spreadSource: getSpreadSource(g, true)};
+  }
   // Try reversed (game stored with teams swapped)
   const k2 = `${year}_${visAbbr}_${homeAbbr}`;
   if (HIST_ODDS[k2]) {
     const g = HIST_ODDS[k2];
+    const spread = getSpreadWithFallback(g, false);
     // Swap scores and flip spread since home/away is reversed
-    return {d:g.d, sp: g.sp !== null ? -g.sp : null, ou:g.ou,
-             hml:g.aml, aml:g.hml, hs:g.vs, vs:g.hs, pl:g.pl, homeIsHome:false};
+    return {d:g.d, sp: spread, ou:g.ou,
+             hml:g.aml, aml:g.hml, hs:g.vs, vs:g.hs, pl:g.pl, homeIsHome:false,
+             spreadSource: getSpreadSource(g, false)};
   }
   return null;
+}
+
+// Cascading fallback for spread lookup
+// Priority: Home Line Close → Home Line Open → Away Line Close (inverted) → Away Line Open (inverted) → ESPN → NO LINE
+function getSpreadWithFallback(game, homeIsHome) {
+  // Helper to safely parse and validate spread values
+  const parseSpread = (val) => {
+    if (val === null || val === undefined || val === '') return null;
+    const num = parseFloat(val);
+    return isNaN(num) ? null : num;
+  };
+  
+  if (homeIsHome) {
+    // Game stored correctly: home team is actually home
+    // 1. Try Home Line Close
+    let spread = parseSpread(game['Home Line Close']);
+    if (spread !== null) return spread;
+    
+    // 2. Try Home Line Open
+    spread = parseSpread(game['Home Line Open']);
+    if (spread !== null) return spread;
+    
+    // 3. Try Away Line Close (invert sign)
+    spread = parseSpread(game['Away Line Close']);
+    if (spread !== null) return -spread;
+    
+    // 4. Try Away Line Open (invert sign)
+    spread = parseSpread(game['Away Line Open']);
+    if (spread !== null) return -spread;
+    
+    // 5. Try legacy 'sp' field (ESPN or other source)
+    spread = parseSpread(game.sp);
+    if (spread !== null) return spread;
+    
+    // 6. No line available
+    return null;
+  } else {
+    // Game stored reversed: home/away are swapped
+    // When reversed, Away lines become Home lines and vice versa
+    // 1. Try Away Line Close (this is actually the home team's line, so don't invert)
+    let spread = parseSpread(game['Away Line Close']);
+    if (spread !== null) return spread;
+    
+    // 2. Try Away Line Open
+    spread = parseSpread(game['Away Line Open']);
+    if (spread !== null) return spread;
+    
+    // 3. Try Home Line Close (invert because it's for the away team)
+    spread = parseSpread(game['Home Line Close']);
+    if (spread !== null) return -spread;
+    
+    // 4. Try Home Line Open (invert)
+    spread = parseSpread(game['Home Line Open']);
+    if (spread !== null) return -spread;
+    
+    // 5. Try legacy 'sp' field and invert
+    spread = parseSpread(game.sp);
+    if (spread !== null) return -spread;
+    
+    // 6. No line available
+    return null;
+  }
+}
+
+// Get the source of the spread for debugging/display purposes
+function getSpreadSource(game, homeIsHome) {
+  const parseSpread = (val) => {
+    if (val === null || val === undefined || val === '') return null;
+    const num = parseFloat(val);
+    return isNaN(num) ? null : num;
+  };
+  
+  if (homeIsHome) {
+    if (parseSpread(game['Home Line Close']) !== null) return 'Home Line Close';
+    if (parseSpread(game['Home Line Open']) !== null) return 'Home Line Open';
+    if (parseSpread(game['Away Line Close']) !== null) return 'Away Line Close (inverted)';
+    if (parseSpread(game['Away Line Open']) !== null) return 'Away Line Open (inverted)';
+    if (parseSpread(game.sp) !== null) return 'ESPN';
+    return 'NO LINE';
+  } else {
+    if (parseSpread(game['Away Line Close']) !== null) return 'Away Line Close';
+    if (parseSpread(game['Away Line Open']) !== null) return 'Away Line Open';
+    if (parseSpread(game['Home Line Close']) !== null) return 'Home Line Close (inverted)';
+    if (parseSpread(game['Home Line Open']) !== null) return 'Home Line Open (inverted)';
+    if (parseSpread(game.sp) !== null) return 'ESPN';
+    return 'NO LINE';
+  }
 }
 
 // Convert decimal odds to American moneyline
