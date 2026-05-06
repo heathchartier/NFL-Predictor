@@ -2319,18 +2319,31 @@ async function backfillYear(yr) {
 
         if(pr2==='COVER')W++;else if(pr2==='LOSE')L++;else if(pr2==='PUSH')P++;
         if(ouR==='WIN')ouW++;else if(ouR==='LOSE')ouL++;else if(ouR==='PUSH')ouP++;
+        
+        // Determine Tier 1 status (home off bye OR home Thursday)
+        const isHomeOffBye = false; // Backfill doesn't have bye week data
+        const isHomeThursday = tmpGame.dayOfWeek === 4; // Thursday = day 4
+        const isTier1 = isHomeThursday && c.pickSide === 'HOME';
+        
         if(pr2!=='N/A') wkGamesData[ev.id]={
+          home: hd.team.displayName || hd.team.name || hAbbr,
+          visitor: vd.team.displayName || vd.team.name || vAbbr,
+          pick: c.pickFull || c.pickTeam,
+          pickTeam: c.pickTeam,
+          pickSide: c.pickSide,
+          spread: spread,
+          estMargin: c.estSpread || 0,
           hScore:hs, vScore:vs, pickResult:pr2, ouResult:ouR,
           spreadDiff: c.spreadDiff,  // store for ranking after loop
           suResult, rank:null, isDog:c.isDog,
-          hadSpread:spread!==null, isBetable
+          hadSpread:spread!==null, isBetable, isTier1
         };
       }
 
       // Assign ranks within this week based on spreadDiff (largest=most confident=highest rank)
       const rankable = Object.entries(wkGamesData)
         .filter(([,g]) => g.spreadDiff !== null && g.spreadDiff !== undefined)
-        .sort((a,b) => (a[1].spreadDiff||0) - (b[1].spreadDiff||0)); // ascending = rank 1 first
+        .sort((a,b) => (b[1].spreadDiff||0) - (a[1].spreadDiff||0)); // descending = highest spreadDiff gets rank 1
       rankable.forEach(([id,], i) => { wkGamesData[id].rank = i + 1; });
 
       if (Object.keys(wkGamesData).length) {
@@ -2630,38 +2643,50 @@ function openHistCard(weekKey) {
 
 function renderPickCard(game) {
   const tier1Class = game.isTier1 ? 'tier1' : '';
-  const resultIcon = game.result === 'COVER' ? '✅' : game.result === 'LOSE' ? '❌' : '⚖️';
+  const resultIcon = game.result === 'COVER' ? '✅' : game.result === 'LOSE' ? '❌' : game.result === 'PUSH' ? '⚖️' : '—';
   const resultColor = game.result === 'COVER' ? 'var(--green)' : game.result === 'LOSE' ? 'var(--red)' : 'var(--gold)';
   const spreadDisplay = typeof game.spread === 'number' ? game.spread.toFixed(1) : game.spread;
+  
+  // Format the pick with spread
+  let pickDisplay = game.pickTeam || game.pick || '—';
+  if (game.spread !== null && game.spread !== undefined && typeof game.spread === 'number') {
+    // Show which team with their spread
+    if (game.pickSide === 'HOME') {
+      pickDisplay = `${game.home} ${game.spread > 0 ? '+' : ''}${game.spread.toFixed(1)}`;
+    } else {
+      const visSpread = -game.spread;
+      pickDisplay = `${game.visitor} ${visSpread > 0 ? '+' : ''}${visSpread.toFixed(1)}`;
+    }
+  }
   
   return `
     <div class="pick-card ${tier1Class}">
       <div class="pick-header">
-        <div class="pick-rank">#${game.rank}</div>
+        <div class="pick-rank">#${game.rank || 0}</div>
         <div class="pick-matchup">
-          <div class="pick-teams">${game.home} vs ${game.visitor}</div>
+          <div class="pick-teams">${game.home || '—'} vs ${game.visitor || '—'}</div>
           <div class="pick-meta">
             ${game.isTier1 ? '<span style="color:var(--gold)">★ TIER 1 PREMIUM</span> · ' : ''}
             Spread: ${spreadDisplay}
           </div>
         </div>
         <div class="pick-prediction">
-          <div class="pick-team">${game.pickTeam}</div>
+          <div class="pick-team">${pickDisplay}</div>
           <div class="pick-confidence" style="color:${resultColor}">${resultIcon} ${game.result}</div>
         </div>
       </div>
       <div class="pick-stats">
         <div class="pick-stat">
           <div class="pick-stat-label">Est. Margin</div>
-          <div class="pick-stat-value">${game.estMargin.toFixed(1)}</div>
+          <div class="pick-stat-value">${(game.estMargin || 0).toFixed(1)}</div>
         </div>
         <div class="pick-stat">
           <div class="pick-stat-label">Spread Diff</div>
-          <div class="pick-stat-value" style="color:${game.spreadDiff >= 9 ? 'var(--green)' : game.spreadDiff >= 6 ? 'var(--gold)' : 'var(--text)'}">${game.spreadDiff.toFixed(1)}</div>
+          <div class="pick-stat-value" style="color:${(game.spreadDiff || 0) >= 9 ? 'var(--green)' : (game.spreadDiff || 0) >= 6 ? 'var(--gold)' : 'var(--text)'}">${(game.spreadDiff || 0).toFixed(1)}</div>
         </div>
         <div class="pick-stat">
           <div class="pick-stat-label">Final Score</div>
-          <div class="pick-stat-value">${game.hScore.toFixed(0)}-${game.vScore.toFixed(0)}</div>
+          <div class="pick-stat-value">${(game.hScore || 0).toFixed(0)}-${(game.vScore || 0).toFixed(0)}</div>
         </div>
       </div>
     </div>
