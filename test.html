@@ -479,6 +479,12 @@ button:disabled{opacity:.4;cursor:not-allowed}
           <option value="2025" selected>2025</option><option value="2024">2024</option>
           <option value="2023">2023</option><option value="2022">2022</option><option value="2021">2021</option>
           <option value="2020">2020</option><option value="2019">2019</option><option value="2018">2018</option>
+          <option value="2017">2017</option><option value="2016">2016</option><option value="2015">2015</option>
+          <option value="2014">2014</option><option value="2013">2013</option><option value="2012">2012</option>
+          <option value="2011">2011</option><option value="2010">2010</option><option value="2009">2009</option>
+          <option value="2008">2008</option><option value="2007">2007</option><option value="2006">2006</option>
+          <option value="2005">2005</option><option value="2004">2004</option><option value="2003">2003</option>
+          <option value="2002">2002</option>
         </select>
       </div>
       <button class="btn-gold" id="bf-btn" onclick="startBackfill()">▶ Start Backfill</button>
@@ -2341,10 +2347,20 @@ async function backfillYear(yr) {
       }
 
       // Assign ranks within this week based on spreadDiff (largest=most confident=highest rank)
-      const rankable = Object.entries(wkGamesData)
+      // Games WITH spreadDiff ranked first (highest to lowest), games WITHOUT spreadDiff ranked last
+      const gamesWithDiff = Object.entries(wkGamesData)
         .filter(([,g]) => g.spreadDiff !== null && g.spreadDiff !== undefined)
-        .sort((a,b) => (b[1].spreadDiff||0) - (a[1].spreadDiff||0)); // descending = highest spreadDiff gets rank 1
-      rankable.forEach(([id,], i) => { wkGamesData[id].rank = i + 1; });
+        .sort((a,b) => (b[1].spreadDiff||0) - (a[1].spreadDiff||0)); // descending
+      
+      const gamesWithoutDiff = Object.entries(wkGamesData)
+        .filter(([,g]) => g.spreadDiff === null || g.spreadDiff === undefined);
+      
+      // Rank games with spreadDiff first
+      gamesWithDiff.forEach(([id,], i) => { wkGamesData[id].rank = i + 1; });
+      
+      // Rank games without spreadDiff after (lower ranks)
+      const startRank = gamesWithDiff.length + 1;
+      gamesWithoutDiff.forEach(([id,], i) => { wkGamesData[id].rank = startRank + i; });
 
       if (Object.keys(wkGamesData).length) {
         history[wkKey] = { meta:{week:wk,year:yr,source:'backfill'}, games:wkGamesData };
