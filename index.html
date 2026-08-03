@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SpreadLab — Public Track Record</title>
+<script>
+// Auto-refresh for iOS home screen saves — checks for new deploy on return from background
+(function() {
+  const IDLE_MS = 5 * 60 * 1000; // reload check after 5 min in background
+  let hiddenAt = null;
+  function storeVersion() {
+    fetch(location.pathname + '?_hd=' + Date.now(), {method:'HEAD', cache:'no-store'})
+      .then(function(r) {
+        var lm = r.headers.get('last-modified') || r.headers.get('etag') || '';
+        if (lm) sessionStorage.setItem('_sl_v', lm);
+      }).catch(function(){});
+  }
+  function checkAndReload() {
+    fetch(location.pathname + '?_hd=' + Date.now(), {method:'HEAD', cache:'no-store'})
+      .then(function(r) {
+        var lm = r.headers.get('last-modified') || r.headers.get('etag') || '';
+        if (lm && lm !== sessionStorage.getItem('_sl_v')) {
+          sessionStorage.setItem('_sl_v', lm);
+          location.reload();
+        }
+      }).catch(function(){});
+  }
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+      hiddenAt = Date.now();
+    } else if (hiddenAt && (Date.now() - hiddenAt) > IDLE_MS) {
+      checkAndReload();
+    }
+  });
+  storeVersion();
+})();
+</script>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { overflow-x: hidden; max-width: 100vw; }
+
+:root {
+  --ink:   #0c0e14;
+  --ink2:  #12151f;
+  --ink3:  #181c28;
+  --ink4:  #1e2335;
+  --line:  #252c42;
+  --line2: #2e3850;
+  --gold:  #d4a843;
+  --gold2: #f0c866;
+  --green: #00e5b8;
+  --red:   #e84545;
+  --text:  #c8d4ee;
+  --text2: #7a8aaa;
+  --text3: #4a5a7a;
+}
+
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: 'DM Sans', -apple-system, 'Segoe UI', sans-serif;
+  min-height: 100vh;
+}
+
+/* ── HEADER ── */
+.site-header {
+  background: var(--ink2);
+  border-bottom: 1px solid var(--line);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 26px;
+  letter-spacing: 3px;
+  color: var(--green);
+}
+.logo span { color: var(--text2); font-size: 14px; letter-spacing: 1px; margin-left: 8px; font-family: 'DM Mono', monospace; }
+.header-nav a {
+  color: var(--text2);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+.header-nav a:hover { color: var(--text); border-color: var(--line2); }
+
+/* ── HERO ── */
+.hero {
+  background: linear-gradient(135deg, var(--ink2) 0%, #0d1020 100%);
+  border-bottom: 1px solid var(--line);
+  padding: 40px 24px 36px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 800px 400px at 50% -20%, rgba(0,229,184,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: var(--green);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.hero-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(36px, 8vw, 64px);
+  letter-spacing: 2px;
+  color: var(--text);
+  line-height: 1;
+  margin-bottom: 10px;
+}
+.hero-title span { color: var(--green); }
+.hero-sub {
+  font-size: 14px;
+  color: var(--text2);
+  max-width: 480px;
+  margin: 0 auto 24px;
+  line-height: 1.6;
+}
+.trust-badges {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.badge {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.5px;
+}
+.badge-green  { background: rgba(0,229,184,0.1); border: 1px solid rgba(0,229,184,0.25); color: var(--green); }
+.badge-gold   { background: rgba(212,168,67,0.1);  border: 1px solid rgba(212,168,67,0.25);  color: var(--gold2); }
+.badge-blue   { background: rgba(61,125,212,0.1);  border: 1px solid rgba(61,125,212,0.25);  color: #6ba3f5; }
+
+/* ── CONTENT ── */
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 60px;
+}
+
+/* ── BIG STATS ── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.stat-card {
+  background: var(--ink2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px 18px;
+  text-align: center;
+}
+.stat-card.highlight { border-color: rgba(0,229,184,0.3); background: rgba(0,229,184,0.04); }
+.stat-val {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px;
+  letter-spacing: 1px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.stat-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text2);
+  font-family: 'DM Mono', monospace;
+}
+.stat-sub {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 4px;
+  font-family: 'DM Mono', monospace;
+}
+.pbar { height: 4px; background: var(--ink3); border-radius: 2px; margin: 10px 0 4px; overflow: hidden; }
+.pfill { height: 100%; border-radius: 2px; background: var(--green); }
+.pfill-r { background: var(--red); }
+
+/* ── BANKROLL CHART ── */
+.section-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  letter-spacing: 2px;
+  color: var(--text2);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.chart-box {
+  background: var(--ink2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 14px 12px;
+  margin-bottom: 28px;
+  overflow-x: auto;
+}
+.chart-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+/* ── SEASON TABLE ── */
+.stbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 28px;
+}
+.stbl th {
+  background: var(--ink3);
+  color: var(--text2);
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+.stbl td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--text2);
+}
+.stbl tr:hover td { background: rgba(255,255,255,0.02); }
+.stbl .yr-cell { color: var(--green); font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 1px; }
+.pct-hi { color: var(--green); font-weight: 700; }
+.pct-mid { color: var(--gold2); font-weight: 700; }
+.pct-lo { color: var(--red); font-weight: 700; }
+.wk-cell { color: var(--green); }
+.lk-cell { color: var(--red); }
+
+/* ── WEEK TABLE ── */
+.wtbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 28px;
+}
+.wtbl th {
+  background: var(--ink3);
+  color: var(--text2);
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.wtbl td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(37,44,66,0.5);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text2);
+  white-space: nowrap;
+}
+.wtbl tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* ── DISCLAIMER ── */
+.disclaimer {
+  background: var(--ink3);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.7;
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 24px;
+}
+.disclaimer strong { color: var(--text2); }
+
+/* ── KELLY SIMULATOR ── */
+.kelly-box { background:var(--ink2);border:1px solid rgba(0,229,184,0.2);border-radius:12px;padding:20px;margin-bottom:28px; }
+.kelly-intro { font-size:12px;color:var(--text2);font-family:'DM Mono',monospace;line-height:1.7;margin-bottom:16px; }
+.kelly-inputs { display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px; }
+.kelly-field { display:flex;flex-direction:column;gap:5px; }
+.kelly-field label { font-size:10px;font-family:'DM Mono',monospace;color:var(--text3);letter-spacing:1px;text-transform:uppercase; }
+.kelly-field input[type=number] { background:var(--ink3);border:1px solid var(--line);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;width:100%; }
+.kelly-field input[type=number]:focus { outline:none;border-color:var(--green); }
+.kelly-slider-row { display:flex;justify-content:space-between;align-items:center;margin-bottom:6px; }
+.kelly-slider-row span { font-size:11px;font-family:'DM Mono',monospace;color:var(--text2); }
+.ks-frac-val { color:var(--green);font-weight:700; }
+input[type=range].ks-slider { width:100%;accent-color:var(--green);margin-bottom:10px;cursor:pointer; }
+.kelly-presets { display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px; }
+.kp-btn { background:var(--ink3);border:1px solid var(--line);border-radius:20px;padding:4px 12px;font-size:11px;font-family:'DM Mono',monospace;color:var(--text2);cursor:pointer;transition:all 0.15s; }
+.kp-btn:hover,.kp-btn.active { background:rgba(0,229,184,0.1);border-color:var(--green);color:var(--green); }
+.kelly-rg { display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px; }
+.kelly-rc { background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:14px 10px;text-align:center; }
+.kelly-rv { font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--green);letter-spacing:1px;line-height:1;margin-bottom:4px; }
+.kelly-rv.neg { color:var(--red); }
+.kelly-rv.neu { color:var(--text); }
+.kelly-rl { font-size:10px;font-family:'DM Mono',monospace;color:var(--text3);letter-spacing:1px;text-transform:uppercase; }
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text3);
+}
+.empty-state .em-icon { font-size: 56px; margin-bottom: 16px; }
+.empty-state h2 { font-size: 20px; color: var(--text2); margin-bottom: 8px; }
+.empty-state p { font-size: 13px; line-height: 1.6; max-width: 380px; margin: 0 auto 20px; }
+.empty-state a { color: var(--green); text-decoration: none; font-weight: 700; }
+
+/* ── EMAIL CAPTURE ── */
+.email-section {
+  background: linear-gradient(135deg, #0a1218 0%, var(--ink2) 100%);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 36px 24px;
+  text-align: center;
+}
+.email-section .em-eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: var(--green);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.email-section h2 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(26px, 6vw, 42px);
+  letter-spacing: 2px;
+  color: var(--text);
+  margin-bottom: 8px;
+  line-height: 1;
+}
+.email-section h2 span { color: var(--green); }
+.email-section p {
+  font-size: 13px;
+  color: var(--text2);
+  max-width: 420px;
+  margin: 0 auto 22px;
+  line-height: 1.6;
+}
+.substack-embed-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 0 auto 4px;
+}
+.substack-embed-wrap iframe {
+  width: 100%;
+  max-width: 480px;
+  height: 150px;
+  border-radius: 10px;
+  border: 1px solid var(--line2);
+}
+.email-fine {
+  font-size: 10px;
+  color: var(--text3);
+  font-family: 'DM Mono', monospace;
+  margin-top: 12px;
+}
+
+/* ── FOOTER ── */
+.site-footer {
+  background: var(--ink2);
+  border-top: 1px solid var(--line);
+  padding: 20px 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text3);
+  font-family: 'DM Mono', monospace;
+}
+.site-footer a { color: var(--text2); text-decoration: none; }
+
+/* ── COUNTDOWN ── */
+.countdown-section {
+  background: linear-gradient(135deg, rgba(0,229,184,0.07) 0%, #0c0f1a 100%);
+  border-top: 1px solid rgba(0,229,184,0.18);
+  border-bottom: 1px solid rgba(0,229,184,0.18);
+  padding: 28px 20px 22px;
+  text-align: center;
+}
+.cd-eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: var(--green);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  opacity: 0.85;
+}
+.cd-timer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.cd-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 72px;
+}
+.cd-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(48px, 11vw, 80px);
+  color: var(--green);
+  line-height: 1;
+  letter-spacing: 2px;
+  text-shadow: 0 0 24px rgba(0,229,184,0.28);
+}
+.cd-lbl {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  color: var(--text3);
+  text-transform: uppercase;
+  margin-top: 5px;
+}
+.cd-colon {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(40px, 9vw, 68px);
+  color: var(--text3);
+  line-height: 1;
+  margin-top: 2px;
+  opacity: 0.5;
+}
+.cd-sub {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+.cd-live {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px;
+  color: var(--green);
+  letter-spacing: 4px;
+  text-shadow: 0 0 28px rgba(0,229,184,0.4);
+  padding: 8px 0;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .stbl td, .stbl th { padding: 8px; font-size: 11px; }
+  .wtbl { font-size: 10px; }
+  .wtbl td, .wtbl th { padding: 6px 7px; }
+  .cd-unit { min-width: 56px; }
+}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="logo">SpreadLab <span>/ Public Track Record</span></div>
+  <nav class="header-nav" style="display:flex;gap:8px;flex-wrap:wrap">
+    <a href="https://twitter.com/TheSpreadLabs" target="_blank" rel="noopener">𝕏 Twitter</a>
+    <a href="https://instagram.com/thespreadlabs" target="_blank" rel="noopener">📸 Instagram</a>
+    <a href="https://tiktok.com/@thespreadlabs" target="_blank" rel="noopener">🎵 TikTok</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="hero-label">@TheSpreadLabs · Full Transparency</div>
+  <h1 class="hero-title">Public <span>Pick Record</span></h1>
+  <p class="hero-sub">Every pick, every result, every season. No cherry-picking. No hiding losses. Verified by backtest algorithm.</p>
+  <div class="trust-badges">
+    <span class="badge badge-green">✓ Algorithm-Verified</span>
+    <span class="badge badge-gold">★ Playable Picks Only</span>
+    <span class="badge badge-blue">📊 Full History</span>
+  </div>
+</section>
+
+<!-- ── COUNTDOWN ──────────────────────────────────────────────────────────── -->
+<section class="countdown-section">
+  <div class="cd-eyebrow">Season 1 · 2026 NFL · Picks Posted Before Every Kickoff</div>
+  <div id="countdown-wrap">
+    <div class="cd-timer">
+      <div class="cd-unit"><div class="cd-num" id="cd-days">--</div><div class="cd-lbl">Days</div></div>
+      <div class="cd-colon">:</div>
+      <div class="cd-unit"><div class="cd-num" id="cd-hours">--</div><div class="cd-lbl">Hrs</div></div>
+      <div class="cd-colon">:</div>
+      <div class="cd-unit"><div class="cd-num" id="cd-mins">--</div><div class="cd-lbl">Min</div></div>
+      <div class="cd-colon">:</div>
+      <div class="cd-unit"><div class="cd-num" id="cd-secs">--</div><div class="cd-lbl">Sec</div></div>
+    </div>
+    <div class="cd-sub">Week 1 kickoff · Thu Sep 10, 2026 · 8:20 PM ET</div>
+  </div>
+</section>
+
+<!-- ── EMAIL CAPTURE ────────────────────────────────────────────────────── -->
+<!-- SETUP: Replace YOUR-HANDLE below with your Substack subdomain         -->
+<!-- e.g. if your Substack is thespreadlabs.substack.com use "thespreadlabs" -->
+<section class="email-section">
+  <div class="em-eyebrow">Free Picks · Every Week</div>
+  <h2>Get <span>Picks</span> by Email</h2>
+  <p>Tier 1 picks sent straight to your inbox every week. Free all season. No spam — just the algorithm's best bets.</p>
+  <div class="substack-embed-wrap">
+    <iframe src="https://thespreadlabs.substack.com/embed" frameborder="0" scrolling="no"></iframe>
+  </div>
+  <div class="email-fine">Free all season · Unsubscribe anytime</div>
+</section>
+
+<main class="container">
+  <div id="main-content">
+    <div class="empty-state">
+      <div class="em-icon">📊</div>
+      <h2>Loading record...</h2>
+      <p>Reading your pick history from local storage...</p>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div>SpreadLab · NFL ATS Prediction Tool · <a href="https://tinyurl.com/SpreadLab" style="color:var(--green)">tinyurl.com/SpreadLab</a></div>
+  <div style="margin-top:4px;color:var(--text3)">All picks tracked publicly · No paid picks withheld · Backtest formula locked V1.3</div>
+</footer>
+
+<script>
+// ─── READ HISTORY (public JSON first, localStorage fallback) ────────────────
+async function loadData() {
+  try {
+    const res = await fetch('public_record.json?_=' + Date.now());
+    if (res.ok) {
+      const d = await res.json();
+      if (d.history && Object.keys(d.history).length) {
+        return { history: d.history, source: 'public', exportedAt: d.exportedAt, windRecord: d.windRecord || null };
+      }
+    }
+  } catch(e) {}
+  try {
+    const stored = JSON.parse(localStorage.getItem('nfl_p1') || '{}');
+    const h = stored.history || null;
+    return h && Object.keys(h).length ? { history: h, source: 'local', windRecord: null } : null;
+  } catch(e) { return null; }
+}
+
+// ─── BANKROLL CALC (mirrors calculator logic) ────────────────────────────────
+function calcBankroll(history) {
+  const START = 1000, UNIT = 100, ATS_WIN = 100 / 110;
+  let balance = START, peak = START, trough = START, maxDD = 0;
+  let atsW = 0, atsL = 0, mlW = 0, mlL = 0;
+  const points = [{ balance: START }];
+
+  const weeks = Object.entries(history)
+    .filter(([, wd]) => wd.games)
+    .sort(([a],[b])=>{
+      const [aY,aWStr]=a.split('_');const [bY,bWStr]=b.split('_');
+      const aW=parseInt((aWStr||'').replace('w',''));const bW=parseInt((bWStr||'').replace('w',''));
+      return +aY!==+bY?+aY-+bY:aW-bW;
+    });
+
+  for (const [, wd] of weeks) {
+    Object.values(wd.games).forEach(r => {
+      if (r.isBetable && r.pickResult && r.pickResult !== 'N/A' && r.pickResult !== 'PENDING') {
+        const bet = r.isTier1 ? UNIT * 2 : UNIT;
+        if (r.pickResult === 'COVER') { balance += bet * ATS_WIN; atsW++; }
+        else if (r.pickResult === 'LOSE') { balance -= bet; atsL++; }
+        if (r.pickResult !== 'PUSH') {
+          if (balance > peak) peak = balance;
+          if (balance < trough) trough = balance;
+          const dd = peak - balance;
+          if (dd > maxDD) maxDD = dd;
+          points.push({ balance });
+        }
+      }
+      if (r.mlPlayable && r.mlResult && r.mlResult !== 'N/A' && r.mlResult !== 'PENDING') {
+        const mlBet = UNIT * 0.5;
+        if (r.mlResult === 'WIN') { balance += mlBet * (r.mlDecimalPayout || 0); mlW++; }
+        else if (r.mlResult === 'LOSE') { balance -= mlBet; mlL++; }
+        if (r.mlResult !== 'PUSH') {
+          if (balance > peak) peak = balance;
+          if (balance < trough) trough = balance;
+          const dd = peak - balance;
+          if (dd > maxDD) maxDD = dd;
+          points.push({ balance });
+        }
+      }
+    });
+  }
+
+  return { points, start: START, currentBalance: balance, peak, trough, maxDD,
+    roi: ((balance - START) / START) * 100, totalPnL: balance - START,
+    atsW, atsL, mlW, mlL };
+}
+
+// ─── WIND-UNDER SECTION ──────────────────────────────────────────────────────
+// windRecord shape (from computeWindRecord() in the calculator, exported via
+// exportPublicRecord()): { all:{w,l,p,n,pct,roi}, strong:{...}, byEra:{'2010-13':{...},...} }
+function buildWindSection(windRecord) {
+  if (!windRecord || !windRecord.all || !windRecord.all.n) return '';
+  const col = pct => pct == null ? 'var(--text3)' : pct >= 56 ? 'var(--green)' : pct >= 52.4 ? 'var(--gold2)' : 'var(--red)';
+  const fmtPct = st => st.pct != null ? st.pct.toFixed(1) + '%' : '--';
+  const fmtRoi = st => st.roi != null ? (st.roi >= 0 ? '+' : '') + st.roi.toFixed(1) + '%' : '--';
+  const eraLabels = ['2010-13', '2014-17', '2018-21', '2022-25'];
+  const eraCards = eraLabels.map(e => {
+    const st = windRecord.byEra?.[e];
+    if (!st || !st.n) return '';
+    return `<div style="background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:10px 8px;text-align:center">
+      <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-bottom:4px">${e}</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:${col(st.pct)}">${fmtPct(st)}</div>
+      <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace">${st.w}-${st.l}${st.p?'-'+st.p:''}</div>
+    </div>`;
+  }).join('');
+  return `
+    <div class="section-title">🌬️ Wind-Under Model — Totals</div>
+    <div style="background:linear-gradient(135deg,rgba(0,180,220,0.05) 0%,var(--ink2) 100%);border:1px solid rgba(0,180,220,0.2);border-radius:12px;padding:20px 18px;margin-bottom:28px">
+      <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:16px">
+        A second, fully independent model: when forecast wind gusts reach <strong style="color:#5cf">25+ mph</strong> at kickoff for an outdoor game, the total tends to go <strong style="color:#5cf">UNDER</strong> more often than the market prices in — wind knocks down passing and kicking. Tracked separately from the ATS picks above.
+      </p>
+      <div class="stat-grid" style="margin-bottom:14px">
+        <div class="stat-card highlight">
+          <div class="stat-val" style="color:${col(windRecord.all.pct)}">${fmtPct(windRecord.all)}</div>
+          <div class="stat-lbl">Gust ≥25mph → Under</div>
+          <div class="stat-sub">${windRecord.all.w}W · ${windRecord.all.l}L${windRecord.all.p?' · '+windRecord.all.p+'P':''} · ${fmtRoi(windRecord.all)} ROI</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" style="color:${col(windRecord.strong?.pct)}">${fmtPct(windRecord.strong||{})}</div>
+          <div class="stat-lbl">Gust ≥30mph (strong)</div>
+          <div class="stat-sub">${windRecord.strong ? windRecord.strong.w+'W · '+windRecord.strong.l+'L · '+fmtRoi(windRecord.strong)+' ROI' : '--'}</div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">By Era — Improving, Not Decaying</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
+        ${eraCards}
+      </div>
+    </div>`;
+}
+
+// ─── SVG CHART ───────────────────────────────────────────────────────────────
+function buildChart(bk) {
+  const W = 760, H = 160, PX = 6, PY = 12;
+  const bals = bk.points.map(p => p.balance);
+  const lo = Math.min(...bals) * 0.97;
+  const hi = Math.max(...bals) * 1.03;
+  const range = hi - lo || 1;
+  const n = bk.points.length;
+  const toX = i => PX + (i / (n - 1)) * (W - PX * 2);
+  const toY = b => PY + ((hi - b) / range) * (H - PY * 2);
+  const startY = toY(bk.start);
+  const lineCol = bk.currentBalance >= bk.start ? '#00e5b8' : '#e84545';
+
+  const pts = bk.points.map((p, i) => `${toX(i).toFixed(1)},${toY(p.balance).toFixed(1)}`).join(' ');
+  const area = `M${toX(0).toFixed(1)},${toY(bk.points[0].balance).toFixed(1)} ` +
+    bk.points.map((p, i) => `L${toX(i).toFixed(1)},${toY(p.balance).toFixed(1)}`).join(' ') +
+    ` L${toX(n-1).toFixed(1)},${startY.toFixed(1)} L${toX(0).toFixed(1)},${startY.toFixed(1)} Z`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block" xmlns="http://www.w3.org/2000/svg">
+    <line x1="${PX}" y1="${startY.toFixed(1)}" x2="${W-PX}" y2="${startY.toFixed(1)}"
+          stroke="rgba(255,255,255,0.12)" stroke-dasharray="5,4" stroke-width="1"/>
+    <path d="${area}" fill="${lineCol}" opacity="0.08"/>
+    <polyline points="${pts}" fill="none" stroke="${lineCol}" stroke-width="2"
+              stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${toX(0).toFixed(1)}" cy="${toY(bk.points[0].balance).toFixed(1)}" r="3" fill="${lineCol}" opacity="0.6"/>
+    <circle cx="${toX(n-1).toFixed(1)}" cy="${toY(bk.currentBalance).toFixed(1)}" r="4" fill="${lineCol}"/>
+    <text x="${PX+2}" y="${(startY-4).toFixed(1)}" fill="rgba(255,255,255,0.3)"
+          font-size="9" font-family="DM Mono,monospace">$${bk.start}</text>
+    <text x="${(W-PX-2).toFixed(1)}" y="${(toY(bk.currentBalance)-5).toFixed(1)}"
+          fill="${lineCol}" font-size="10" text-anchor="end" font-weight="700"
+          font-family="DM Mono,monospace">$${bk.currentBalance.toFixed(0)}</text>
+  </svg>`;
+}
+
+// ─── MAIN RENDER ─────────────────────────────────────────────────────────────
+async function render() {
+  const result = await loadData();
+  const history = result?.history;
+  const dataSource = result?.source;
+  const exportedAt = result?.exportedAt;
+  const windRecord = result?.windRecord;
+  const el = document.getElementById('main-content');
+
+  if (!history || !Object.keys(history).length) {
+    el.innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-card highlight">
+          <div class="stat-val" style="color:var(--green)">65.5%</div>
+          <div class="stat-lbl">Playable Win Rate</div>
+          <div class="pbar"><div class="pfill" style="width:65.5%"></div></div>
+          <div class="stat-sub">1,404W · 741L · 2,163 picks · 2010–2025</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val">16</div>
+          <div class="stat-lbl">Seasons Backtested</div>
+          <div class="stat-sub">2010 – 2025 verified data</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" style="color:#5cf">55.5%</div>
+          <div class="stat-lbl">Wind-Under Model</div>
+          <div class="stat-sub">Gust ≥25mph · +5.9% ROI · 60%+ recent</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" style="color:var(--green)">Sep 2026</div>
+          <div class="stat-lbl">Live Season Starts</div>
+          <div class="stat-sub">Every pick posted publicly in real time</div>
+        </div>
+      </div>
+      <div class="section-title" style="margin-top:8px">📋 What to Expect</div>
+      <div class="disclaimer">
+        <strong>Backtest methodology:</strong> The SpreadLab algorithm was built on 16 years of NFL ATS data (2010–2025) using actual Vegas closing lines. Playable picks require a spread ≥3.5 points and a model edge above the threshold; the estimated-margin "dead zone" (6–12 pts) is excluded for visitor picks only, since home picks in that range have held up as profitable in every era tested. <strong>Week 1 is always excluded</strong> — preseason stats are too unreliable to generate confident picks (historically ~27% ATS in Week 1). 2013 shows partial data — not all weeks were tracked in the source database, so that season is flagged and not representative. Tier 1 picks (home team off a bye or playing Thursday at home) receive 2-unit sizing.<br><br>
+        A second independent model flags <strong>Wind-Under</strong> plays — outdoor games with forecast gusts ≥25mph at kickoff, where the total tends to go under more than the market prices in.<br><br>
+        <strong>Starting Week 1 of the 2026 NFL season</strong>, every pick will be posted publicly before kickoff and tracked here in real time — wins, losses, and pushes included. No cherry-picking. No hiding results. We also publish a full Pro Pick'em confidence card every week (ranked 1–16) so you can use our rankings directly in your pick'em leagues.<br><br>
+        Follow along: <strong><a href="https://twitter.com/TheSpreadLabs" target="_blank" rel="noopener" style="color:var(--green)">@TheSpreadLabs</a></strong> on X for weekly picks and results.
+      </div>`;
+    return;
+  }
+
+  // ── Aggregate totals ────────────────────────────────────────────────────────
+  let totW=0, totL=0, totP=0, totGames=0, seasons=new Set();
+  const byYear = {};
+  const weekRows = [];
+
+  Object.entries(history)
+    .filter(([,wd]) => wd.games)
+    .sort(([a],[b])=>{
+      const [aY,aWStr]=a.split('_');const [bY,bWStr]=b.split('_');
+      const aW=parseInt((aWStr||'').replace('w',''));const bW=parseInt((bWStr||'').replace('w',''));
+      return +aY!==+bY?+aY-+bY:aW-bW;
+    })
+    .forEach(([wkKey, wd]) => {
+      const m = wd.meta || {};
+      const yr = m.year; const wk = m.week;
+      if (!yr) return;
+      seasons.add(yr);
+      if (!byYear[yr]) byYear[yr] = { W:0, L:0, P:0, wks:0, bW:0, bL:0, bP:0, source: m.source||'backfill' };
+      let wW=0, wL=0, wP=0, bW=0, bL=0, bP=0;
+      Object.values(wd.games).forEach(r => {
+        if (r.pickResult === 'COVER') { wW++; if(r.isBetable) bW++; }
+        else if (r.pickResult === 'LOSE') { wL++; if(r.isBetable) bL++; }
+        else if (r.pickResult === 'PUSH') { wP++; if(r.isBetable) bP++; }
+      });
+      byYear[yr].W += wW; byYear[yr].L += wL; byYear[yr].P += wP;
+      byYear[yr].bW += bW; byYear[yr].bL += bL; byYear[yr].bP += bP;
+      byYear[yr].wks++;
+      totW += bW; totL += bL; totP += bP; totGames += bW + bL + bP;
+
+      const pct = bW+bL > 0 ? ((bW/(bW+bL))*100).toFixed(0) : '--';
+      const pcc = parseFloat(pct)>=56?'pct-hi':parseFloat(pct)>=50?'pct-mid':bW+bL>0?'pct-lo':'';
+      const src = m.source === 'manual' ? '<span style="color:#6ba3f5">live</span>' : '<span style="color:var(--text3)">backtest</span>';
+      weekRows.push({ yr, wk, bW, bL, bP, pct, pcc, src, key: wkKey });
+    });
+
+  const totEff = totW + totL;
+  const totPct = totEff > 0 ? ((totW / totEff) * 100).toFixed(1) : '--';
+  const totPctCol = parseFloat(totPct) >= 56 ? 'var(--green)' : parseFloat(totPct) >= 52 ? 'var(--gold2)' : 'var(--red)';
+
+  // ── Bankroll ────────────────────────────────────────────────────────────────
+  const bk = calcBankroll(history);
+  const bkCol  = bk.currentBalance >= bk.start ? 'var(--green)' : 'var(--red)';
+  const roiSign = bk.roi >= 0 ? '+' : '';
+  const pnlSign = bk.totalPnL >= 0 ? '+$' : '-$';
+
+  // ── Season rows ─────────────────────────────────────────────────────────────
+  const seasonRows = Object.entries(byYear)
+    .sort(([a],[b]) => b - a)
+    .map(([yr, d]) => {
+      const eff = d.bW + d.bL;
+      const pct = eff > 0 ? ((d.bW / eff) * 100).toFixed(1) : '--';
+      const pcc = parseFloat(pct)>=56?'pct-hi':parseFloat(pct)>=50?'pct-mid':eff>0?'pct-lo':'';
+      const src = d.source === 'manual' ? '<span style="color:#6ba3f5">live</span>' : '<span style="color:var(--text3)">backtest</span>';
+      return `<tr>
+        <td class="yr-cell">${yr}</td>
+        <td>${d.wks}</td>
+        <td class="wk-cell">${d.bW}</td>
+        <td class="lk-cell">${d.bL}</td>
+        <td>${d.bP}</td>
+        <td class="${pcc}">${pct}%</td>
+        <td>${src}</td>
+      </tr>`;
+    }).join('');
+
+  // ── Week table ──────────────────────────────────────────────────────────────
+  const allWkYears = [...new Set(weekRows.map(r => r.yr))].sort((a,b) => b - a);
+  const wkYearOpts = `<option value="all">All Years</option>` +
+    allWkYears.map(yr => `<option value="${yr}">${yr}</option>`).join('');
+  const weekTableRows = weekRows.map(r => `<tr data-yr="${r.yr}">
+    <td style="color:var(--green);font-family:'Bebas Neue',sans-serif;font-size:16px">${r.yr}</td>
+    <td>${r.wk}</td>
+    <td class="wk-cell">${r.bW}</td>
+    <td class="lk-cell">${r.bL}</td>
+    <td>${r.bP}</td>
+    <td class="${r.pcc}">${r.pct !== '--' ? r.pct+'%' : '--'}</td>
+    <td>${r.src}</td>
+  </tr>`).join('');
+
+  // ── Best weeks ──────────────────────────────────────────────────────────────
+  const bestWeeks = weekRows
+    .filter(r => r.bW + r.bL >= 3)
+    .map(r => ({
+      ...r,
+      eff: r.bW + r.bL,
+      winPct: r.bW / (r.bW + r.bL),
+      pnl: r.bW * (100 / 110) * 100 - r.bL * 100
+    }))
+    .sort((a, b) => b.winPct - a.winPct || b.bW - a.bW)
+    .slice(0, 5);
+
+  // ── Now timestamp ───────────────────────────────────────────────────────────
+  const now = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  const updatedLabel = exportedAt
+    ? 'Record last exported: ' + new Date(exportedAt).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+    : 'Updated: ' + now;
+
+  el.innerHTML = `
+    <!-- Big stats -->
+    <div class="stat-grid">
+      <div class="stat-card highlight">
+        <div class="stat-val" style="color:${totPctCol}">${totPct}%</div>
+        <div class="stat-lbl">ATS Win Rate</div>
+        <div class="pbar"><div class="pfill" style="width:${Math.min(parseFloat(totPct)||0,100)}%"></div></div>
+        <div class="stat-sub">${totW}W · ${totL}L · ${totP}P</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">${totGames}</div>
+        <div class="stat-lbl">Total Picks</div>
+        <div class="stat-sub">${seasons.size} seasons · playable only</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:${bkCol}">$${bk.currentBalance.toFixed(0)}</div>
+        <div class="stat-lbl">Bankroll</div>
+        <div class="stat-sub">${pnlSign}${Math.abs(bk.totalPnL).toFixed(0)} from $${bk.start}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:${bkCol}">${roiSign}${bk.roi.toFixed(1)}%</div>
+        <div class="stat-lbl">ROI</div>
+        <div class="stat-sub">1u=$100 · T1=2u · T2=1u · ML=0.5u (tabled)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--green)">$${bk.peak.toFixed(0)}</div>
+        <div class="stat-lbl">Peak Balance</div>
+        <div class="stat-sub">Max drawdown: $${bk.maxDD.toFixed(0)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">${bk.atsW + bk.atsL + bk.mlW + bk.mlL}</div>
+        <div class="stat-lbl">Bets Tracked</div>
+        <div class="stat-sub">${bk.atsW+bk.atsL} ATS · ${bk.mlW+bk.mlL} ML</div>
+      </div>
+    </div>
+
+    <!-- Season 1 Teaser -->
+    <div class="section-title">🏈 Season 1 — Going Live September 2026</div>
+    <div style="background:linear-gradient(135deg,rgba(0,229,184,0.05) 0%,var(--ink2) 100%);border:1px solid rgba(0,229,184,0.2);border-radius:12px;padding:20px 18px;margin-bottom:28px">
+      <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:16px">
+        Starting <strong style="color:var(--green)">Week 1 of the 2026 NFL season</strong>, every pick goes public before kickoff — ranked 1–16 by confidence, Tier 1 flagged, full results posted Monday. The 16-year backtest above is the foundation. Season 1 is where it goes live.
+      </p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px;margin-bottom:16px">
+        <div style="background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:14px 12px">
+          <div style="font-size:10px;color:var(--green);font-family:'DM Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Saturday</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.5">Full picks card — all 16 games ranked by confidence. Tier 1 best bets flagged. Posted before kickoff.</div>
+        </div>
+        <div style="background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:14px 12px">
+          <div style="font-size:10px;color:var(--green);font-family:'DM Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Pick'em Card</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.5">Pro Pick'em confidence card every week — use SpreadLab's rankings directly in your pick'em league.</div>
+        </div>
+        <div style="background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:14px 12px">
+          <div style="font-size:10px;color:var(--green);font-family:'DM Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Monday</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.5">Full results posted — wins, losses, pushes. No cherry-picking. Every result tracked here in real time.</div>
+        </div>
+        <div style="background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:14px 12px">
+          <div style="font-size:10px;color:var(--green);font-family:'DM Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Algorithm vs Pros</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.5">Weekly breakdown: SpreadLab's model vs top professional handicappers. Who's right more often?</div>
+        </div>
+      </div>
+      <div style="text-align:center">
+        <a href="https://thespreadlabs.substack.com" target="_blank" rel="noopener"
+          style="display:inline-block;background:var(--green);color:#000;font-weight:700;font-size:13px;padding:10px 26px;border-radius:8px;text-decoration:none;letter-spacing:0.5px">Get Picks by Email →</a>
+        <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:8px">Free all season · Beat line movement · Unsubscribe anytime</div>
+      </div>
+    </div>
+
+    <!-- Bankroll chart -->
+    <div class="section-title">📈 Bankroll Curve</div>
+    <div class="chart-box">
+      <div class="chart-label">$1,000 start · Tier 1=2u · Tier 2=1u · ML=0.5u (tabled) · standard −110 ATS</div>
+      ${bk.points.length > 1 ? buildChart(bk) : '<div style="color:var(--text3);font-size:12px;padding:20px;text-align:center">Not enough pick data to draw curve.</div>'}
+    </div>
+
+    <!-- Best Historical Weeks -->
+    <div class="section-title">🏆 Best Historical Weeks</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:28px">
+      ${bestWeeks.map((w, i) => {
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
+        const borderCol = i === 0 ? 'rgba(212,168,67,0.4)' : i === 1 ? 'rgba(180,180,190,0.3)' : i === 2 ? 'rgba(180,120,60,0.3)' : 'var(--line)';
+        const bgCol = i === 0 ? 'rgba(212,168,67,0.06)' : 'var(--ink2)';
+        const pnlStr = (w.pnl >= 0 ? '+$' : '-$') + Math.abs(w.pnl).toFixed(0);
+        const pnlCol = w.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+        return `<div style="background:${bgCol};border:1px solid ${borderCol};border-radius:12px;padding:16px 14px;text-align:center">
+          <div style="font-size:22px;margin-bottom:6px">${medal}</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--green);letter-spacing:1px;line-height:1">${(w.winPct*100).toFixed(0)}%</div>
+          <div style="font-size:10px;font-family:'DM Mono',monospace;color:var(--text3);letter-spacing:1px;margin:4px 0 8px">WIN RATE</div>
+          <div style="font-size:13px;font-family:'DM Mono',monospace;color:var(--text2);margin-bottom:4px">${w.bW}-${w.bL}${w.bP>0?`-${w.bP}`:''}</div>
+          <div style="font-size:12px;font-weight:700;color:${pnlCol};font-family:'DM Mono',monospace;margin-bottom:6px">${pnlStr}</div>
+          <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace">${w.yr} · Wk ${w.wk}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    ${buildWindSection(windRecord)}
+
+    <!-- How This Works -->
+    <div class="section-title" style="margin-top:8px">📋 How This Works</div>
+    <div class="disclaimer">
+      The SpreadLab algorithm was built on 16 years of NFL ATS data (2010–2025) using actual Vegas closing lines. Nothing is withheld or cherry-picked — every pick the model generates is tracked here, wins and losses alike.<br><br>
+      <strong>Playable picks</strong> require a spread ≥3.5 points and a sufficient model edge. The estimated-margin "dead zone" (6–12 pts) is excluded for <strong>visitor picks only</strong> — home picks in that range have been reliably profitable across every era tested. <strong>Tier 1</strong> (home off bye or Thursday home game) receives 2-unit sizing; <strong>Tier 2</strong> receives 1 unit.<br><br>
+      <strong>Moneyline picks are currently tabled, not abandoned</strong> — after testing, the model's ML edge did not hold up to a real ROI standard, so no ML picks are placed for now while a redesigned version is developed.<br><br>
+      <strong>Week 1 is excluded from ATS picks</strong> — preseason stats are too unreliable (historically ~27% ATS). A full Pro Pick'em confidence card ranked 1–16 is still published for Week 1 for pick'em leagues. <strong>2013 is partial data</strong> — not all weeks were tracked in the source.<br><br>
+      Starting Week 1 of the 2026 season, every pick will be posted publicly before kickoff. Follow along: <strong><a href="https://twitter.com/TheSpreadLabs" target="_blank" rel="noopener" style="color:var(--green)">@TheSpreadLabs</a></strong>
+    </div>
+
+    <!-- Kelly Simulator -->
+    <div class="section-title" style="margin-top:4px">🧮 Kelly Criterion Simulator</div>
+    <div class="kelly-box">
+      <p class="kelly-intro">See how different bet-sizing strategies compound over time. Defaults show SpreadLab's 16-year backtest edge — try <strong style="color:var(--text)">55%</strong> to model a realistic sharp bettor, or enter your own numbers. <strong style="color:var(--gold2)">Note:</strong> results are theoretical (constant edge, no sportsbook limits). Large numbers at high win rates are mathematically correct — a genuine 65%+ edge compounded over 1,500+ bets is historically unprecedented.</p>
+      <div class="kelly-inputs">
+        <div class="kelly-field"><label>Win Rate %</label>
+          <input type="number" id="ks-wr" value="65.5" min="52" max="99" step="0.1" oninput="updateKS()"></div>
+        <div class="kelly-field"><label>Juice (American)</label>
+          <input type="number" id="ks-odds" value="-110" min="-500" max="500" step="1" oninput="updateKS()"></div>
+        <div class="kelly-field"><label>Starting Bankroll</label>
+          <input type="number" id="ks-bank" value="1000" min="100" step="100" oninput="updateKS()"></div>
+        <div class="kelly-field"><label>Total Picks</label>
+          <input type="number" id="ks-picks" value="1981" min="1" step="1" oninput="updateKS()"></div>
+      </div>
+      <div class="kelly-slider-row">
+        <span>Kelly Fraction</span>
+        <span class="ks-frac-val" id="ks-frac-display">25% of full Kelly</span>
+      </div>
+      <input type="range" class="ks-slider" id="ks-slider" min="1" max="100" value="25" oninput="updateKS()">
+      <div class="kelly-presets">
+        <button class="kp-btn" onclick="setKS(10,this)">1/10 Kelly</button>
+        <button class="kp-btn active" onclick="setKS(25,this)">¼ Kelly</button>
+        <button class="kp-btn" onclick="setKS(50,this)">½ Kelly</button>
+        <button class="kp-btn" onclick="setKS(100,this)">Full Kelly</button>
+      </div>
+      <div class="kelly-rg" id="ks-results"></div>
+    </div>
+
+    <!-- Season breakdown -->
+    <div class="section-title">📅 Season-by-Season</div>
+    <div style="overflow-x:auto;margin-bottom:28px">
+      <table class="stbl">
+        <thead><tr>
+          <th>Season</th><th>Weeks</th><th>W</th><th>L</th><th>Push</th><th>Win%</th><th>Source</th>
+        </tr></thead>
+        <tbody>${seasonRows || '<tr><td colspan="7" style="color:var(--text3);text-align:center;padding:20px">No data</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    <!-- Week-by-week -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line)">
+      <div class="section-title" style="margin:0;border:none;padding:0">📋 Week-by-Week History</div>
+      <select id="wk-yr-sel" onchange="filterWkTable(this.value)"
+        style="background:var(--ink2);border:1px solid var(--line);border-radius:6px;padding:5px 10px;color:var(--text2);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer">
+        ${wkYearOpts}
+      </select>
+    </div>
+    <div style="overflow-x:auto;margin-bottom:28px">
+      <table class="wtbl">
+        <thead><tr>
+          <th>Year</th><th>Wk</th><th>W</th><th>L</th><th>P</th><th>Win%</th><th>Source</th>
+        </tr></thead>
+        <tbody id="wk-body">${weekTableRows || '<tr><td colspan="7" style="color:var(--text3);text-align:center;padding:20px">No weekly data</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    <div class="disclaimer" style="margin-top:8px;font-size:11px;color:var(--text3)"><strong>${updatedLabel}</strong></div>`;
+}
+
+render().then(() => updateKS());
+
+// ── COUNTDOWN ────────────────────────────────────────────────────────────────
+(function() {
+  const TARGET = new Date('2026-09-10T20:20:00-04:00');
+  function tick() {
+    const diff = TARGET - Date.now();
+    const wrap = document.getElementById('countdown-wrap');
+    if (!wrap) return;
+    if (diff <= 0) {
+      wrap.innerHTML = '<div class="cd-live">🏈 Season 1 Is Live</div>';
+      return;
+    }
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    const fmt = n => String(n).padStart(2, '0');
+    document.getElementById('cd-days').textContent  = d;
+    document.getElementById('cd-hours').textContent = fmt(h);
+    document.getElementById('cd-mins').textContent  = fmt(m);
+    document.getElementById('cd-secs').textContent  = fmt(s);
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+
+function filterWkTable(yr) {
+  document.querySelectorAll('#wk-body tr').forEach(tr => {
+    tr.style.display = (yr === 'all' || tr.dataset.yr === String(yr)) ? '' : 'none';
+  });
+}
+
+// ── Kelly Simulator ──────────────────────────────────────────────────────────
+function calcKS() {
+  const p    = parseFloat(document.getElementById('ks-wr').value) / 100;
+  const odds = parseFloat(document.getElementById('ks-odds').value);
+  const bank = parseFloat(document.getElementById('ks-bank').value);
+  const picks= parseInt(document.getElementById('ks-picks').value);
+  const frac = parseInt(document.getElementById('ks-slider').value) / 100;
+  if (isNaN(p)||isNaN(odds)||isNaN(bank)||isNaN(picks)) return null;
+  const b = odds < 0 ? 100 / Math.abs(odds) : odds / 100;
+  const q = 1 - p;
+  const fullK = (b * p - q) / b;
+  if (fullK <= 0) return null;
+  const f = fullK * frac;
+  const wins = Math.round(picks * p);
+  const losses = picks - wins;
+  const final = bank * Math.pow(1 + f * b, wins) * Math.pow(1 - f, losses);
+  return { fullK: fullK * 100, appliedF: f * 100, final, roi: (final - bank) / bank * 100, bank };
+}
+
+function ksFmt$(n) {
+  if (!isFinite(n)) return '$∞';
+  if (n >= 1e12) return '$' + (n/1e12).toFixed(1) + 'T';
+  if (n >= 1e9)  return '$' + (n/1e9).toFixed(2) + 'B';
+  if (n >= 1e6)  return '$' + (n/1e6).toFixed(2) + 'M';
+  if (n >= 1e3)  return '$' + (n/1e3).toFixed(0) + 'K';
+  return '$' + n.toFixed(0);
+}
+
+function ksFmtROI(r) {
+  if (!isFinite(r)) return '+∞%';
+  const pre = r >= 0 ? '+' : '';
+  if (Math.abs(r) >= 1e9) return pre + (r/1e9).toFixed(1) + 'B%';
+  if (Math.abs(r) >= 1e6) return pre + (r/1e6).toFixed(1) + 'M%';
+  if (Math.abs(r) >= 1e3) return pre + (r/1e3).toFixed(0) + 'K%';
+  return pre + r.toFixed(0) + '%';
+}
+
+function updateKS() {
+  const frac = document.getElementById('ks-slider').value;
+  document.getElementById('ks-frac-display').textContent = frac + '% of full Kelly';
+  const res = calcKS();
+  const el = document.getElementById('ks-results');
+  if (!el) return;
+  if (!res) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--gold2);font-family:\'DM Mono\',monospace;padding:10px;text-align:center">⚠ No edge at this win rate / odds combination.</div>';
+    return;
+  }
+  const neg = res.final < res.bank;
+  el.innerHTML = `
+    <div class="kelly-rc">
+      <div class="kelly-rv${neg?' neg':''}">${ksFmt$(res.final)}</div>
+      <div class="kelly-rl">Final Bankroll</div>
+    </div>
+    <div class="kelly-rc">
+      <div class="kelly-rv${neg?' neg':''}">${ksFmtROI(res.roi)}</div>
+      <div class="kelly-rl">Total ROI</div>
+    </div>
+    <div class="kelly-rc">
+      <div class="kelly-rv neu">${res.fullK.toFixed(1)}%</div>
+      <div class="kelly-rl">Full Kelly / Pick</div>
+    </div>
+    <div class="kelly-rc">
+      <div class="kelly-rv neu">${res.appliedF.toFixed(1)}%</div>
+      <div class="kelly-rl">Your Kelly / Pick</div>
+    </div>`;
+}
+
+function setKS(val, btn) {
+  document.getElementById('ks-slider').value = val;
+  document.querySelectorAll('.kp-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  updateKS();
+}
+
+</script>
+</body>
+</html>
