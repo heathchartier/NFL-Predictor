@@ -704,6 +704,30 @@ async function render() {
   const windRecord = result?.windRecord;
   const el = document.getElementById('main-content');
 
+  // ── ATS RECORD TEMPORARILY PULLED (Sep 2, 2026) ─────────────────────────────
+  // A grading bug was found in the historical backtest (backfillYear() graded
+  // ATS results against the wrong side of the spread). The 65.5% figure and
+  // every number derived from it (bankroll, season table, week table) are not
+  // trustworthy and must not display anywhere until the backfill is corrected
+  // and re-verified. This unconditionally short-circuits before any of that
+  // math runs, regardless of whether history data loaded. The Wind-Under model
+  // is a separate, independently-graded system (verified unaffected) and stays.
+  if (true) {
+    const windHtml = windRecord ? buildWindSection(windRecord) : '';
+    el.innerHTML = `
+      <div class="disclaimer" style="border-color:var(--gold);background:rgba(212,168,67,.06)">
+        <strong style="color:var(--gold2)">⚠ ATS record temporarily removed for correction.</strong>
+        We found a scoring bug in our historical backtest — some picks were graded against the wrong side of the spread, which inflated the win rate we'd been publishing. We caught it before Week 1 and before posting any real picks on it. We're rebuilding the model properly rather than putting a number back up we can't fully stand behind. New, independently-verified numbers will replace this note once that's done.
+      </div>
+      ${windHtml}
+      <div class="section-title" style="margin-top:8px">📋 What to Expect</div>
+      <div class="disclaimer">
+        <strong>Starting Week 1 of the 2026 NFL season</strong>, every pick will be posted publicly before kickoff and tracked here in real time — wins, losses, and pushes included. No cherry-picking. No hiding results.<br><br>
+        Follow along: <strong><a href="https://twitter.com/TheSpreadLabs" target="_blank" rel="noopener" style="color:var(--green)">@TheSpreadLabs</a></strong> on X for updates.
+      </div>`;
+    return;
+  }
+
   if (!history || !Object.keys(history).length) {
     el.innerHTML = `
       <div class="stat-grid">
