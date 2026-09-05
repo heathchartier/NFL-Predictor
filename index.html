@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>SpreadLab — Public Track Record</title>
+<title>The Spread Labs — Honest NFL Analytics</title>
 <script>
 // Auto-refresh for iOS home screen saves — checks for new deploy on return from background
 (function() {
@@ -495,13 +495,13 @@ input[type=range].ks-slider { width:100%;accent-color:var(--green);margin-bottom
 </header>
 
 <section class="hero">
-  <div class="hero-label">@TheSpreadLabs · Full Transparency</div>
-  <h1 class="hero-title">Public <span>Pick Record</span></h1>
-  <p class="hero-sub">Every pick, every result, every season. No cherry-picking. No hiding losses. Verified by backtest algorithm.</p>
+  <div class="hero-label">@TheSpreadLabs · Show Your Work</div>
+  <h1 class="hero-title">We Show <span>Our Work</span></h1>
+  <p class="hero-sub">Every pick posted before kickoff. Every result posted after &mdash; wins and losses. Including the time we found our own numbers were wrong and said so.</p>
   <div class="trust-badges">
-    <span class="badge badge-green">✓ Algorithm-Verified</span>
-    <span class="badge badge-gold">★ Playable Picks Only</span>
-    <span class="badge badge-blue">📊 Full History</span>
+    <span class="badge badge-green">✓ No Hyped Win Rates</span>
+    <span class="badge badge-gold">★ Losses Posted Too</span>
+    <span class="badge badge-blue">📊 Methods Public</span>
   </div>
 </section>
 
@@ -528,7 +528,7 @@ input[type=range].ks-slider { width:100%;accent-color:var(--green);margin-bottom
 <section class="email-section">
   <div class="em-eyebrow">Free Picks · Every Week</div>
   <h2>Get <span>Picks</span> by Email</h2>
-  <p>Tier 1 picks sent straight to your inbox every week. Free all season. No spam — just the algorithm's best bets.</p>
+  <p>Our weekly plays and pool cards, straight to your inbox. Free all season. No spam, no upsells, no fake lock of the week.</p>
   <div class="substack-embed-wrap">
     <iframe src="https://thespreadlabs.substack.com/embed" frameborder="0" scrolling="no"></iframe>
   </div>
@@ -698,333 +698,98 @@ function buildChart(bk) {
 // ─── MAIN RENDER ─────────────────────────────────────────────────────────────
 async function render() {
   const result = await loadData();
-  const history = result?.history;
-  const dataSource = result?.source;
-  const exportedAt = result?.exportedAt;
   const windRecord = result?.windRecord;
   const el = document.getElementById('main-content');
 
-  // ── ATS RECORD TEMPORARILY PULLED (Sep 2, 2026) ─────────────────────────────
-  // A grading bug was found in the historical backtest (backfillYear() graded
-  // ATS results against the wrong side of the spread). The 65.5% figure and
-  // every number derived from it (bankroll, season table, week table) are not
-  // trustworthy and must not display anywhere until the backfill is corrected
-  // and re-verified. This unconditionally short-circuits before any of that
-  // math runs, regardless of whether history data loaded. The Wind-Under model
-  // is a separate, independently-graded system (verified unaffected) and stays.
-  if (true) {
-    const windHtml = windRecord ? buildWindSection(windRecord) : '';
-    el.innerHTML = `
-      <div class="disclaimer" style="border-color:var(--gold);background:rgba(212,168,67,.06)">
-        <strong style="color:var(--gold2)">⚠ ATS record temporarily removed for correction.</strong>
-        We found a scoring bug in our historical backtest — some picks were graded against the wrong side of the spread, which inflated the win rate we'd been publishing. We caught it before Week 1 and before posting any real picks on it. We're rebuilding the model properly rather than putting a number back up we can't fully stand behind. New, independently-verified numbers will replace this note once that's done.
-      </div>
-      ${windHtml}
-      <div class="section-title" style="margin-top:8px">📋 What to Expect</div>
-      <div class="disclaimer">
-        <strong>Starting Week 1 of the 2026 NFL season</strong>, every pick will be posted publicly before kickoff and tracked here in real time — wins, losses, and pushes included. No cherry-picking. No hiding results.<br><br>
-        Follow along: <strong><a href="https://twitter.com/TheSpreadLabs" target="_blank" rel="noopener" style="color:var(--green)">@TheSpreadLabs</a></strong> on X for updates.
-      </div>`;
-    return;
-  }
-
-  if (!history || !Object.keys(history).length) {
-    el.innerHTML = `
-      <div class="stat-grid">
-        <div class="stat-card highlight">
-          <div class="stat-val" style="color:var(--green)">65.5%</div>
-          <div class="stat-lbl">Playable Win Rate</div>
-          <div class="pbar"><div class="pfill" style="width:65.5%"></div></div>
-          <div class="stat-sub">1,404W · 741L · 2,163 picks · 2010–2025</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val">16</div>
-          <div class="stat-lbl">Seasons Backtested</div>
-          <div class="stat-sub">2010 – 2025 verified data</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" style="color:#5cf">55.5%</div>
-          <div class="stat-lbl">Wind-Under Model</div>
-          <div class="stat-sub">Gust ≥25mph · +5.9% ROI · 60%+ recent</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" style="color:var(--green)">Sep 2026</div>
-          <div class="stat-lbl">Live Season Starts</div>
-          <div class="stat-sub">Every pick posted publicly in real time</div>
-        </div>
-      </div>
-      <div class="section-title" style="margin-top:8px">📋 What to Expect</div>
-      <div class="disclaimer">
-        <strong>Backtest methodology:</strong> The SpreadLab algorithm was built on 16 years of NFL ATS data (2010–2025) using actual Vegas closing lines. Playable picks require a spread ≥3.5 points and a model edge above the threshold; the estimated-margin "dead zone" (6–12 pts) is excluded for visitor picks only, since home picks in that range have held up as profitable in every era tested. <strong>Week 1 is always excluded</strong> — preseason stats are too unreliable to generate confident picks (historically ~27% ATS in Week 1). 2013 shows partial data — not all weeks were tracked in the source database, so that season is flagged and not representative. Tier 1 picks (home team off a bye or playing Thursday at home) receive 2-unit sizing.<br><br>
-        A second independent model flags <strong>Wind-Under</strong> plays — outdoor games with forecast gusts ≥25mph at kickoff, where the total tends to go under more than the market prices in.<br><br>
-        <strong>Starting Week 1 of the 2026 NFL season</strong>, every pick will be posted publicly before kickoff and tracked here in real time — wins, losses, and pushes included. No cherry-picking. No hiding results. We also publish a full Pro Pick'em confidence card every week (ranked 1–16) so you can use our rankings directly in your pick'em leagues.<br><br>
-        Follow along: <strong><a href="https://twitter.com/TheSpreadLabs" target="_blank" rel="noopener" style="color:var(--green)">@TheSpreadLabs</a></strong> on X for weekly picks and results.
-      </div>`;
-    return;
-  }
-
-  // ── Aggregate totals ────────────────────────────────────────────────────────
-  let totW=0, totL=0, totP=0, totGames=0, seasons=new Set();
-  const byYear = {};
-  const weekRows = [];
-
-  Object.entries(history)
-    .filter(([,wd]) => wd.games)
-    .sort(([a],[b])=>{
-      const [aY,aWStr]=a.split('_');const [bY,bWStr]=b.split('_');
-      const aW=parseInt((aWStr||'').replace('w',''));const bW=parseInt((bWStr||'').replace('w',''));
-      return +aY!==+bY?+aY-+bY:aW-bW;
-    })
-    .forEach(([wkKey, wd]) => {
-      const m = wd.meta || {};
-      const yr = m.year; const wk = m.week;
-      if (!yr) return;
-      seasons.add(yr);
-      if (!byYear[yr]) byYear[yr] = { W:0, L:0, P:0, wks:0, bW:0, bL:0, bP:0, source: m.source||'backfill' };
-      let wW=0, wL=0, wP=0, bW=0, bL=0, bP=0;
-      Object.values(wd.games).forEach(r => {
-        if (r.pickResult === 'COVER') { wW++; if(r.isBetable) bW++; }
-        else if (r.pickResult === 'LOSE') { wL++; if(r.isBetable) bL++; }
-        else if (r.pickResult === 'PUSH') { wP++; if(r.isBetable) bP++; }
-      });
-      byYear[yr].W += wW; byYear[yr].L += wL; byYear[yr].P += wP;
-      byYear[yr].bW += bW; byYear[yr].bL += bL; byYear[yr].bP += bP;
-      byYear[yr].wks++;
-      totW += bW; totL += bL; totP += bP; totGames += bW + bL + bP;
-
-      const pct = bW+bL > 0 ? ((bW/(bW+bL))*100).toFixed(0) : '--';
-      const pcc = parseFloat(pct)>=56?'pct-hi':parseFloat(pct)>=50?'pct-mid':bW+bL>0?'pct-lo':'';
-      const src = m.source === 'manual' ? '<span style="color:#6ba3f5">live</span>' : '<span style="color:var(--text3)">backtest</span>';
-      weekRows.push({ yr, wk, bW, bL, bP, pct, pcc, src, key: wkKey });
-    });
-
-  const totEff = totW + totL;
-  const totPct = totEff > 0 ? ((totW / totEff) * 100).toFixed(1) : '--';
-  const totPctCol = parseFloat(totPct) >= 56 ? 'var(--green)' : parseFloat(totPct) >= 52 ? 'var(--gold2)' : 'var(--red)';
-
-  // ── Bankroll ────────────────────────────────────────────────────────────────
-  const bk = calcBankroll(history);
-  const bkCol  = bk.currentBalance >= bk.start ? 'var(--green)' : 'var(--red)';
-  const roiSign = bk.roi >= 0 ? '+' : '';
-  const pnlSign = bk.totalPnL >= 0 ? '+$' : '-$';
-
-  // ── Season rows ─────────────────────────────────────────────────────────────
-  const seasonRows = Object.entries(byYear)
-    .sort(([a],[b]) => b - a)
-    .map(([yr, d]) => {
-      const eff = d.bW + d.bL;
-      const pct = eff > 0 ? ((d.bW / eff) * 100).toFixed(1) : '--';
-      const pcc = parseFloat(pct)>=56?'pct-hi':parseFloat(pct)>=50?'pct-mid':eff>0?'pct-lo':'';
-      const src = d.source === 'manual' ? '<span style="color:#6ba3f5">live</span>' : '<span style="color:var(--text3)">backtest</span>';
-      return `<tr>
-        <td class="yr-cell">${yr}</td>
-        <td>${d.wks}</td>
-        <td class="wk-cell">${d.bW}</td>
-        <td class="lk-cell">${d.bL}</td>
-        <td>${d.bP}</td>
-        <td class="${pcc}">${pct}%</td>
-        <td>${src}</td>
-      </tr>`;
-    }).join('');
-
-  // ── Week table ──────────────────────────────────────────────────────────────
-  const allWkYears = [...new Set(weekRows.map(r => r.yr))].sort((a,b) => b - a);
-  const wkYearOpts = `<option value="all">All Years</option>` +
-    allWkYears.map(yr => `<option value="${yr}">${yr}</option>`).join('');
-  const weekTableRows = weekRows.map(r => `<tr data-yr="${r.yr}">
-    <td style="color:var(--green);font-family:'Bebas Neue',sans-serif;font-size:16px">${r.yr}</td>
-    <td>${r.wk}</td>
-    <td class="wk-cell">${r.bW}</td>
-    <td class="lk-cell">${r.bL}</td>
-    <td>${r.bP}</td>
-    <td class="${r.pcc}">${r.pct !== '--' ? r.pct+'%' : '--'}</td>
-    <td>${r.src}</td>
-  </tr>`).join('');
-
-  // ── Best weeks ──────────────────────────────────────────────────────────────
-  const bestWeeks = weekRows
-    .filter(r => r.bW + r.bL >= 3)
-    .map(r => ({
-      ...r,
-      eff: r.bW + r.bL,
-      winPct: r.bW / (r.bW + r.bL),
-      pnl: r.bW * (100 / 110) * 100 - r.bL * 100
-    }))
-    .sort((a, b) => b.winPct - a.winPct || b.bW - a.bW)
-    .slice(0, 5);
-
-  // ── Now timestamp ───────────────────────────────────────────────────────────
-  const now = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
-  const updatedLabel = exportedAt
-    ? 'Record last exported: ' + new Date(exportedAt).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
-    : 'Updated: ' + now;
-
+  // ── REBUILT Sep 3 2026 ──────────────────────────────────────────────────────
+  // The old ATS track record was produced by a backtest that graded picks
+  // against the wrong side of the spread. Everything derived from it (win rate,
+  // bankroll, season table, week table) was wrong and has been removed rather
+  // than "corrected" -- there is no honest ATS edge to publish. This page now
+  // shows only what we can actually stand behind. Do not re-introduce a
+  // headline ATS percentage here without an independent, pre-registered,
+  // out-of-sample validation.
+  const windHtml = windRecord ? buildWindSection(windRecord) : '';
   el.innerHTML = `
-    <!-- Big stats -->
     <div class="stat-grid">
       <div class="stat-card highlight">
-        <div class="stat-val" style="color:${totPctCol}">${totPct}%</div>
-        <div class="stat-lbl">ATS Win Rate</div>
-        <div class="pbar"><div class="pfill" style="width:${Math.min(parseFloat(totPct)||0,100)}%"></div></div>
-        <div class="stat-sub">${totW}W · ${totL}L · ${totP}P</div>
+        <div class="stat-val" style="color:#5cf">Wind&nbsp;Model</div>
+        <div class="stat-lbl">What We Actually Bet</div>
+        <div class="stat-sub">High wind &rarr; the total goes UNDER<br>~2 plays a week, outdoor games only</div>
       </div>
       <div class="stat-card">
-        <div class="stat-val">${totGames}</div>
-        <div class="stat-lbl">Total Picks</div>
-        <div class="stat-sub">${seasons.size} seasons · playable only</div>
+        <div class="stat-val" style="color:var(--green)">Free</div>
+        <div class="stat-lbl">Every Pick, Public</div>
+        <div class="stat-sub">Posted before kickoff &middot; wins and losses both</div>
       </div>
       <div class="stat-card">
-        <div class="stat-val" style="color:${bkCol}">$${bk.currentBalance.toFixed(0)}</div>
-        <div class="stat-lbl">Bankroll</div>
-        <div class="stat-sub">${pnlSign}${Math.abs(bk.totalPnL).toFixed(0)} from $${bk.start}</div>
+        <div class="stat-val" style="color:var(--gold2)">Pool&nbsp;Tools</div>
+        <div class="stat-lbl">Pick'em &amp; Confidence</div>
+        <div class="stat-sub">Ranked cards for your office pool</div>
       </div>
       <div class="stat-card">
-        <div class="stat-val" style="color:${bkCol}">${roiSign}${bk.roi.toFixed(1)}%</div>
-        <div class="stat-lbl">ROI</div>
-        <div class="stat-sub">1u=$100 · T1=2u · T2=1u · ML=0.5u (tabled)</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" style="color:var(--green)">$${bk.peak.toFixed(0)}</div>
-        <div class="stat-lbl">Peak Balance</div>
-        <div class="stat-sub">Max drawdown: $${bk.maxDD.toFixed(0)}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val">${bk.atsW + bk.atsL + bk.mlW + bk.mlL}</div>
-        <div class="stat-lbl">Bets Tracked</div>
-        <div class="stat-sub">${bk.atsW+bk.atsL} ATS · ${bk.mlW+bk.mlL} ML</div>
+        <div class="stat-val" style="color:var(--green)">Sep 2026</div>
+        <div class="stat-lbl">Season 1 Starts</div>
+        <div class="stat-sub">Tracked live, in public, from game one</div>
       </div>
     </div>
 
-    <!-- Season 1 Teaser -->
-    <div class="section-title">🏈 Season 1 — Going Live September 2026</div>
-    <div style="background:linear-gradient(135deg,rgba(0,229,184,0.05) 0%,var(--ink2) 100%);border:1px solid rgba(0,229,184,0.2);border-radius:12px;padding:20px 18px;margin-bottom:28px">
-      <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:16px">
-        Starting <strong style="color:var(--green)">Week 1 of the 2026 NFL season</strong>, every pick goes public before kickoff — ranked 1–16 by confidence, Tier 1 flagged, full results posted Monday. The 16-year backtest above is the foundation. Season 1 is where it goes live.
-      </p>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px;margin-bottom:16px">
-        <div style="background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:14px 12px">
-          <div style="font-size:10px;color:var(--green);font-family:'DM Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Saturday</div>
-          <div style="font-size:12px;color:var(--text2);line-height:1.5">Full picks card — all 16 games ranked by confidence. Tier 1 best bets flagged. Posted before kickoff.</div>
-        </div>
-        <div style="background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:14px 12px">
-          <div style="font-size:10px;color:var(--green);font-family:'DM Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Pick'em Card</div>
-          <div style="font-size:12px;color:var(--text2);line-height:1.5">Pro Pick'em confidence card every week — use SpreadLab's rankings directly in your pick'em league.</div>
-        </div>
-        <div style="background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:14px 12px">
-          <div style="font-size:10px;color:var(--green);font-family:'DM Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Monday</div>
-          <div style="font-size:12px;color:var(--text2);line-height:1.5">Full results posted — wins, losses, pushes. No cherry-picking. Every result tracked here in real time.</div>
-        </div>
-        <div style="background:var(--ink3);border:1px solid var(--line);border-radius:8px;padding:14px 12px">
-          <div style="font-size:10px;color:var(--green);font-family:'DM Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Algorithm vs Pros</div>
-          <div style="font-size:12px;color:var(--text2);line-height:1.5">Weekly breakdown: SpreadLab's model vs top professional handicappers. Who's right more often?</div>
-        </div>
-      </div>
-      <div style="text-align:center">
-        <a href="https://thespreadlabs.substack.com" target="_blank" rel="noopener"
-          style="display:inline-block;background:var(--green);color:#000;font-weight:700;font-size:13px;padding:10px 26px;border-radius:8px;text-decoration:none;letter-spacing:0.5px">Get Picks by Email →</a>
-        <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:8px">Free all season · Beat line movement · Unsubscribe anytime</div>
-      </div>
-    </div>
-
-    <!-- Bankroll chart -->
-    <div class="section-title">📈 Bankroll Curve</div>
-    <div class="chart-box">
-      <div class="chart-label">$1,000 start · Tier 1=2u · Tier 2=1u · ML=0.5u (tabled) · standard −110 ATS</div>
-      ${bk.points.length > 1 ? buildChart(bk) : '<div style="color:var(--text3);font-size:12px;padding:20px;text-align:center">Not enough pick data to draw curve.</div>'}
-    </div>
-
-    <!-- Best Historical Weeks -->
-    <div class="section-title">🏆 Best Historical Weeks</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:28px">
-      ${bestWeeks.map((w, i) => {
-        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
-        const borderCol = i === 0 ? 'rgba(212,168,67,0.4)' : i === 1 ? 'rgba(180,180,190,0.3)' : i === 2 ? 'rgba(180,120,60,0.3)' : 'var(--line)';
-        const bgCol = i === 0 ? 'rgba(212,168,67,0.06)' : 'var(--ink2)';
-        const pnlStr = (w.pnl >= 0 ? '+$' : '-$') + Math.abs(w.pnl).toFixed(0);
-        const pnlCol = w.pnl >= 0 ? 'var(--green)' : 'var(--red)';
-        return `<div style="background:${bgCol};border:1px solid ${borderCol};border-radius:12px;padding:16px 14px;text-align:center">
-          <div style="font-size:22px;margin-bottom:6px">${medal}</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--green);letter-spacing:1px;line-height:1">${(w.winPct*100).toFixed(0)}%</div>
-          <div style="font-size:10px;font-family:'DM Mono',monospace;color:var(--text3);letter-spacing:1px;margin:4px 0 8px">WIN RATE</div>
-          <div style="font-size:13px;font-family:'DM Mono',monospace;color:var(--text2);margin-bottom:4px">${w.bW}-${w.bL}${w.bP>0?`-${w.bP}`:''}</div>
-          <div style="font-size:12px;font-weight:700;color:${pnlCol};font-family:'DM Mono',monospace;margin-bottom:6px">${pnlStr}</div>
-          <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace">${w.yr} · Wk ${w.wk}</div>
-        </div>`;
-      }).join('')}
-    </div>
-
-    ${buildWindSection(windRecord)}
-
-    <!-- How This Works -->
-    <div class="section-title" style="margin-top:8px">📋 How This Works</div>
+    <div class="section-title" style="margin-top:8px">📋 We Deleted Our Own Track Record. Here's Why.</div>
     <div class="disclaimer">
-      The SpreadLab algorithm was built on 16 years of NFL ATS data (2010–2025) using actual Vegas closing lines. Nothing is withheld or cherry-picked — every pick the model generates is tracked here, wins and losses alike.<br><br>
-      <strong>Playable picks</strong> require a spread ≥3.5 points and a sufficient model edge. The estimated-margin "dead zone" (6–12 pts) is excluded for <strong>visitor picks only</strong> — home picks in that range have been reliably profitable across every era tested. <strong>Tier 1</strong> (home off bye or Thursday home game) receives 2-unit sizing; <strong>Tier 2</strong> receives 1 unit.<br><br>
-      <strong>Moneyline picks are currently tabled, not abandoned</strong> — after testing, the model's ML edge did not hold up to a real ROI standard, so no ML picks are placed for now while a redesigned version is developed.<br><br>
-      <strong>Week 1 is excluded from ATS picks</strong> — preseason stats are too unreliable (historically ~27% ATS). A full Pro Pick'em confidence card ranked 1–16 is still published for Week 1 for pick'em leagues. <strong>2013 is partial data</strong> — not all weeks were tracked in the source.<br><br>
-      Starting Week 1 of the 2026 season, every pick will be posted publicly before kickoff. Follow along: <strong><a href="https://twitter.com/TheSpreadLabs" target="_blank" rel="noopener" style="color:var(--green)">@TheSpreadLabs</a></strong>
+      For a long time this page showed a <strong>65.5% against-the-spread</strong> record going back to 2010.
+      <strong style="color:var(--gold2)">That number was wrong, and we took it down ourselves.</strong><br><br>
+
+      In September 2026 we found a bug in the code that scored our own history: it was grading
+      picks against the wrong side of the spread. It had been quietly inflating the win rate for
+      years. The tell was simple once we looked &mdash; under that same buggy math, "just bet every
+      favorite" came out to 77%. If that were true, sportsbooks wouldn't exist.<br><br>
+
+      Graded correctly, the honest number was about <strong>48%</strong>. Not a winning system. We
+      found it <em>before</em> Week 1 and before a single public pick went out on it.<br><br>
+
+      So we rebuilt from scratch &mdash; nearly a million real plays, twenty seasons, modern
+      analytics, independent outside review. The conclusion was not what we wanted:
+      <strong>the NFL point-spread market is extremely efficient, and we could not beat it.</strong>
+      Neither could a model given information no one could have in real life.<br><br>
+
+      Most people in this business would have quietly swapped in a new number. We'd rather show you
+      the whole thing.
     </div>
 
-    <!-- Kelly Simulator -->
-    <div class="section-title" style="margin-top:4px">🧮 Kelly Criterion Simulator</div>
-    <div class="kelly-box">
-      <p class="kelly-intro">See how different bet-sizing strategies compound over time. Defaults show SpreadLab's 16-year backtest edge — try <strong style="color:var(--text)">55%</strong> to model a realistic sharp bettor, or enter your own numbers. <strong style="color:var(--gold2)">Note:</strong> results are theoretical (constant edge, no sportsbook limits). Large numbers at high win rates are mathematically correct — a genuine 65%+ edge compounded over 1,500+ bets is historically unprecedented.</p>
-      <div class="kelly-inputs">
-        <div class="kelly-field"><label>Win Rate %</label>
-          <input type="number" id="ks-wr" value="65.5" min="52" max="99" step="0.1" oninput="updateKS()"></div>
-        <div class="kelly-field"><label>Juice (American)</label>
-          <input type="number" id="ks-odds" value="-110" min="-500" max="500" step="1" oninput="updateKS()"></div>
-        <div class="kelly-field"><label>Starting Bankroll</label>
-          <input type="number" id="ks-bank" value="1000" min="100" step="100" oninput="updateKS()"></div>
-        <div class="kelly-field"><label>Total Picks</label>
-          <input type="number" id="ks-picks" value="1981" min="1" step="1" oninput="updateKS()"></div>
-      </div>
-      <div class="kelly-slider-row">
-        <span>Kelly Fraction</span>
-        <span class="ks-frac-val" id="ks-frac-display">25% of full Kelly</span>
-      </div>
-      <input type="range" class="ks-slider" id="ks-slider" min="1" max="100" value="25" oninput="updateKS()">
-      <div class="kelly-presets">
-        <button class="kp-btn" onclick="setKS(10,this)">1/10 Kelly</button>
-        <button class="kp-btn active" onclick="setKS(25,this)">¼ Kelly</button>
-        <button class="kp-btn" onclick="setKS(50,this)">½ Kelly</button>
-        <button class="kp-btn" onclick="setKS(100,this)">Full Kelly</button>
-      </div>
-      <div class="kelly-rg" id="ks-results"></div>
+    ${windHtml}
+
+    <div class="section-title">🎯 What We Actually Offer Now</div>
+    <div class="disclaimer">
+      <strong style="color:#5cf">1. The wind model &mdash; the one edge we found that holds up.</strong>
+      When strong wind is forecast at an outdoor game, the total goes UNDER more often than the
+      market accounts for. Wind knocks down the passing and kicking game &mdash; it's physics, not a
+      hunch. It survived every test we could throw at it, including on data our original model never
+      touched. Roughly two plays a week. This is what we bet.<br><br>
+
+      <strong style="color:var(--gold2)">2. Pick'em and confidence tools &mdash; for your pool, not your sportsbook.</strong>
+      Our spread picks run a little better than a coin flip. That is <em>not</em> good enough to beat
+      the house's cut, and we will never tell you otherwise. But a pool has no house cut &mdash; you're
+      just trying to finish ahead of your coworkers. A small, disciplined, consistent edge is
+      genuinely useful there, and correct confidence <em>ordering</em> matters even more than raw
+      pick accuracy. That's the tool we build.<br><br>
+
+      <strong style="color:var(--green)">3. The receipts.</strong> Every pick posted before kickoff.
+      Every result posted after, win or lose. If a model stops working, we'll say so &mdash; we've
+      already proven we'll do it the hard way.
     </div>
 
-    <!-- Season breakdown -->
-    <div class="section-title">📅 Season-by-Season</div>
-    <div style="overflow-x:auto;margin-bottom:28px">
-      <table class="stbl">
-        <thead><tr>
-          <th>Season</th><th>Weeks</th><th>W</th><th>L</th><th>Push</th><th>Win%</th><th>Source</th>
-        </tr></thead>
-        <tbody>${seasonRows || '<tr><td colspan="7" style="color:var(--text3);text-align:center;padding:20px">No data</td></tr>'}</tbody>
-      </table>
-    </div>
-
-    <!-- Week-by-week -->
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line)">
-      <div class="section-title" style="margin:0;border:none;padding:0">📋 Week-by-Week History</div>
-      <select id="wk-yr-sel" onchange="filterWkTable(this.value)"
-        style="background:var(--ink2);border:1px solid var(--line);border-radius:6px;padding:5px 10px;color:var(--text2);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer">
-        ${wkYearOpts}
-      </select>
-    </div>
-    <div style="overflow-x:auto;margin-bottom:28px">
-      <table class="wtbl">
-        <thead><tr>
-          <th>Year</th><th>Wk</th><th>W</th><th>L</th><th>P</th><th>Win%</th><th>Source</th>
-        </tr></thead>
-        <tbody id="wk-body">${weekTableRows || '<tr><td colspan="7" style="color:var(--text3);text-align:center;padding:20px">No weekly data</td></tr>'}</tbody>
-      </table>
-    </div>
-
-    <div class="disclaimer" style="margin-top:8px;font-size:11px;color:var(--text3)"><strong>${updatedLabel}</strong></div>`;
+    <div class="section-title">📅 Season 1 &mdash; Live September 2026</div>
+    <div class="disclaimer">
+      Starting Week 1, every pick goes up publicly before kickoff and gets tracked here in real time.
+      No cherry-picking, no deleted losers, no percentage on this page until it's been earned in the
+      open.<br><br>
+      Follow along: <strong><a href="https://twitter.com/TheSpreadLabs" target="_blank" rel="noopener" style="color:var(--green)">@TheSpreadLabs</a></strong> on X.
+    </div>`;
+  return;
 }
 
-render().then(() => updateKS());
+
+render();
 
 // ── COUNTDOWN ────────────────────────────────────────────────────────────────
 (function() {
